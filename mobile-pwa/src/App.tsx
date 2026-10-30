@@ -28,8 +28,9 @@ export default function App() {
         <div className="min-h-screen bg-[#0a0f1e] text-slate-100 flex flex-col font-sans selection:bg-teal-500 selection:text-slate-950">
           <main className="flex-1">
             <Routes>
-              {/* Public & Onboarding */}
-              <Route path="/" element={<WelcomePage />} />
+              {/* Root & Onboarding */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/welcome" element={<WelcomePage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />

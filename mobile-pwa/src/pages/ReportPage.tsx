@@ -90,7 +90,7 @@ export default function ReportPage() {
         subtitle="Notify campus cybersecurity administrators"
       />
 
-      <div className="max-w-lg mx-auto px-4 pt-4">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {submittedId ? (
           /* Success Screen */
           <div className="bg-slate-900/80 rounded-2xl border border-teal-500/30 p-6 text-center space-y-4 my-6">

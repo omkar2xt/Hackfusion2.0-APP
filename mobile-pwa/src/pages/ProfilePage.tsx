@@ -49,7 +49,7 @@ export default function ProfilePage() {
         subtitle="SignalSafe Campus Account"
       />
 
-      <div className="max-w-lg mx-auto px-4 pt-4 space-y-5">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         {/* User Card */}
         <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center text-slate-950 font-bold text-lg shadow-lg shadow-teal-500/20 flex-shrink-0">

@@ -70,32 +70,34 @@ export const CoachPage: React.FC = () => {
         subtitle="Scenario quizzes & cybersecurity posture"
         showBack
       />
-      <div className="max-w-lg mx-auto px-4 pt-4 space-y-5">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
 
       {/* Progress & Badges Card */}
       {progress && (
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800/80 border border-slate-700/60 shadow-lg">
-          <div className="flex items-center justify-between mb-3">
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800/80 border border-slate-700/60 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div>
-              <span className="text-xs text-slate-400 uppercase font-semibold">Security Posture Level</span>
-              <div className="text-lg font-bold text-teal-300 mt-0.5">{progress.security_level}</div>
+              <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Security Posture Level</span>
+              <div className="text-2xl font-bold text-teal-300 mt-1">{progress.security_level}</div>
             </div>
-            <div className="p-3 bg-teal-500/10 border border-teal-500/30 rounded-2xl text-teal-400 text-center min-w-[70px]">
-              <div className="text-xl font-bold">{progress.total_score}</div>
-              <div className="text-[10px] text-teal-300/80">Points</div>
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-teal-500/10 border border-teal-500/30 rounded-2xl text-teal-400 text-center min-w-[90px]">
+                <div className="text-2xl font-bold">{progress.total_score}</div>
+                <div className="text-xs text-teal-300/80">Total Points</div>
+              </div>
             </div>
           </div>
 
           {progress.badges && progress.badges.length > 0 && (
-            <div className="pt-3 border-t border-slate-700/60">
-              <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-2">Earned Badges</span>
-              <div className="flex flex-wrap gap-2">
+            <div className="pt-4 border-t border-slate-700/60">
+              <span className="text-xs uppercase tracking-wider font-semibold text-slate-400 block mb-2.5">Earned Badges</span>
+              <div className="flex flex-wrap gap-2.5">
                 {progress.badges.map((b, idx) => (
                   <span
                     key={idx}
-                    className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-full text-xs font-semibold"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold shadow-sm"
                   >
-                    <Award className="w-3.5 h-3.5 text-amber-400" />
+                    <Award className="w-4 h-4 text-amber-400" />
                     {b}
                   </span>
                 ))}
@@ -106,46 +108,53 @@ export const CoachPage: React.FC = () => {
       )}
 
       {/* Modules List */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-slate-200">Recommended Learning Modules</h2>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-200">Recommended Learning & Training Modules</h2>
+          <span className="text-xs text-slate-400 bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
+            {modules.length} Modules Available
+          </span>
+        </div>
 
         {loading ? (
-          <div className="p-6 text-center text-xs text-slate-500">Loading learning modules...</div>
+          <div className="p-12 text-center text-sm text-slate-500 bg-slate-900/40 rounded-2xl border border-slate-800">
+            Loading learning modules...
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {modules.map((mod) => {
               const isCompleted = progress?.completed_module_slugs.includes(mod.slug);
               return (
                 <div
                   key={mod.id}
-                  className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition space-y-2.5"
+                  className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-teal-500/40 transition space-y-3.5 shadow-md flex flex-col justify-between"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-slate-100">{mod.title}</span>
-                        {isCompleted && (
-                          <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                            <CheckCircle className="w-3 h-3" /> Completed
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">{mod.description}</p>
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-bold text-sm text-slate-100">{mod.title}</span>
+                      {isCompleted && (
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 shrink-0 font-medium">
+                          <CheckCircle className="w-3 h-3" /> Completed
+                        </span>
+                      )}
                     </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">{mod.description}</p>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[11px] text-slate-400">
-                    <span className="capitalize">{mod.difficulty} • {mod.read_time_minutes} min read</span>
-                    <span className="text-amber-400 font-medium">+{mod.points_reward} pts</span>
-                  </div>
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs text-slate-400">
+                      <span className="capitalize">{mod.difficulty} • {mod.read_time_minutes} min read</span>
+                      <span className="text-amber-400 font-semibold">+{mod.points_reward} pts</span>
+                    </div>
 
-                  <button
-                    onClick={() => handleOpenQuiz(mod)}
-                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-teal-300 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1.5"
-                  >
-                    <span>{isCompleted ? 'Retake Quiz' : 'Start Module & Quiz'}</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
+                    <button
+                      onClick={() => handleOpenQuiz(mod)}
+                      className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 hover:text-white text-teal-300 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
+                    >
+                      <span>{isCompleted ? 'Retake Module Quiz' : 'Start Training & Quiz'}</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               );
             })}

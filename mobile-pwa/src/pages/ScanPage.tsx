@@ -88,7 +88,7 @@ export default function ScanPage() {
         subtitle="Detect malicious URLs & phishing messages"
       />
 
-      <div className="max-w-lg mx-auto px-4 pt-4 space-y-5">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         {/* Tab switch */}
         <div className="grid grid-cols-2 p-1 bg-slate-900 rounded-2xl border border-slate-800">
           <button

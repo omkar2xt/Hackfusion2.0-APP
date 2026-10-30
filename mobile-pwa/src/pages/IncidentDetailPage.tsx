@@ -79,7 +79,7 @@ export default function IncidentDetailPage() {
         showBack
       />
 
-      <div className="max-w-lg mx-auto px-4 pt-4 space-y-5">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         {loading ? (
           <div className="space-y-4">
             <div className="h-28 bg-slate-900 rounded-2xl animate-pulse" />
