@@ -13,6 +13,8 @@ import type { ScanResult } from '../types';
 import { getRiskColor, getRiskBgColor, getScorePercentage, formatDate } from '../utils/helpers';
 import { useState } from 'react';
 
+import CyberSafetyAssistant from './CyberSafetyAssistant';
+
 interface ScanResultCardProps {
   result: ScanResult | null;
   loading: boolean;
@@ -213,6 +215,16 @@ export default function ScanResultCard({ result, loading, onReport }: ScanResult
             ))}
           </ul>
         </div>
+      )}
+
+      {/* Innovation 6: Personalized Cyber Safety Assistant */}
+      {(result.verdict === 'MALICIOUS' || result.verdict === 'SUSPICIOUS' || result.risk_score >= 40) && (
+        <CyberSafetyAssistant
+          threatType={result.input_type}
+          verdict={result.verdict}
+          payload={result.input_value}
+          score={result.risk_score}
+        />
       )}
 
       {/* Timestamp */}

@@ -8,7 +8,7 @@ import {
   Radio,
   Dna,
   GitFork,
-  BookOpen,
+  ShieldCheck,
   FileText,
   User as UserIcon,
 } from 'lucide-react';
@@ -30,7 +30,7 @@ export default function Header({ title, subtitle, showBack = false }: HeaderProp
     { label: 'Cyber Radar', path: '/radar', icon: Radio },
     { label: 'Threat DNA', path: '/threat-dna', icon: Dna },
     { label: 'Trust Graph', path: '/trust-graph', icon: GitFork },
-    { label: 'Safety Coach', path: '/coach', icon: BookOpen },
+    { label: 'Cyber Readiness', path: '/coach', icon: ShieldCheck },
     { label: 'Reports', path: '/reports', icon: FileText },
     { label: 'Profile', path: '/profile', icon: UserIcon },
   ];
