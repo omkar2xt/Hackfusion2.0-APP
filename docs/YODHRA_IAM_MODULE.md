@@ -78,3 +78,4 @@ All IAM screens adhere strictly to the **YODHRA Light Theme System**:
 - Brand Primary: `#315E63`
 - Brand Secondary: `#397C78`
 - Alert Indicators: `#C74747` (Red Alert), `#C58A35` (Elevated), `#27845A` (Secure / Active)
+

@@ -89,3 +89,4 @@ class AssignRoleRequest(BaseModel):
     target_user_email: str
     new_role: str  # Student, Faculty, Department Coordinator, Campus Security Officer, Security Analyst, Institution Administrator, Super Administrator
     reason: Optional[str] = "Departmental IAM assignment"
+

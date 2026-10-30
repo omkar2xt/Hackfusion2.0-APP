@@ -50,15 +50,17 @@ class AlertAndDeviceService:
             )
             db.add(inst)
 
-            camp = CampusModel(
-                id=DEFAULT_CAMPUS_ID,
-                institution_id=DEFAULT_INSTITUTION_ID,
-                name="Vishwanathrao Deshpande Institute of Technology (KLS VDIT)",
-                code="VDIT",
-                location="Dandeli Road, Haliyal, Karnataka 581329",
-                created_at=datetime.utcnow()
-            )
-            db.add(camp)
+            camp = db.query(CampusModel).filter(CampusModel.id == DEFAULT_CAMPUS_ID).first()
+            if not camp:
+                camp = CampusModel(
+                    id=DEFAULT_CAMPUS_ID,
+                    institution_id=DEFAULT_INSTITUTION_ID,
+                    name="Vishwanathrao Deshpande Institute of Technology (KLS VDIT)",
+                    code="VDIT",
+                    location="Dandeli Road, Haliyal, Karnataka 581329",
+                    created_at=datetime.utcnow()
+                )
+                db.add(camp)
 
             departments_data = [
                 {
@@ -114,26 +116,30 @@ class AlertAndDeviceService:
             ]
 
             for dept_info in departments_data:
-                dept = DepartmentModel(
-                    id=dept_info["id"],
-                    campus_id=DEFAULT_CAMPUS_ID,
-                    name=dept_info["name"],
-                    code=dept_info["code"],
-                    head_of_department=dept_info["head"],
-                    created_at=datetime.utcnow()
-                )
-                db.add(dept)
-
-                for gid, gname, grole, gdesc in dept_info["groups"]:
-                    grp = UserGroupModel(
-                        id=gid,
-                        department_id=dept_info["id"],
-                        name=gname,
-                        role_type=grole,
-                        description=gdesc,
+                dept = db.query(DepartmentModel).filter(DepartmentModel.id == dept_info["id"]).first()
+                if not dept:
+                    dept = DepartmentModel(
+                        id=dept_info["id"],
+                        campus_id=DEFAULT_CAMPUS_ID,
+                        name=dept_info["name"],
+                        code=dept_info["code"],
+                        head_of_department=dept_info["head"],
                         created_at=datetime.utcnow()
                     )
-                    db.add(grp)
+                    db.add(dept)
+
+                for gid, gname, grole, gdesc in dept_info["groups"]:
+                    grp = db.query(UserGroupModel).filter(UserGroupModel.id == gid).first()
+                    if not grp:
+                        grp = UserGroupModel(
+                            id=gid,
+                            department_id=dept_info["id"],
+                            name=gname,
+                            role_type=grole,
+                            description=gdesc,
+                            created_at=datetime.utcnow()
+                        )
+                        db.add(grp)
 
             # Seed 2 realistic simulated devices in target proximity zones
             seed_devices = [
@@ -166,7 +172,9 @@ class AlertAndDeviceService:
                 )
             ]
             for sd in seed_devices:
-                db.add(sd)
+                existing_dev = db.query(DeviceRegistrationModel).filter(DeviceRegistrationModel.id == sd.id).first()
+                if not existing_dev:
+                    db.add(sd)
 
             db.commit()
 

@@ -129,3 +129,4 @@ def create_department(
 ):
     """Administrator-only: Adds a new department to the institutional hierarchy."""
     return iam_service.add_department(db=db, admin_id=admin.id, payload=payload)
+
