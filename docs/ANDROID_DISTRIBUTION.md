@@ -105,3 +105,4 @@ Since iOS does not support sideloaded APK files, iPhone users can run YODHRA via
 2. Tap the **Share** button in the Safari toolbar.
 3. Scroll down and tap **Add to Home Screen**.
 4. Launch YODHRA directly from your Home Screen with full native-like fullscreen experience.
+

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">YODHRA – Cyber Intelligence</string>
+    <string name="title_activity_main">YODHRA – Cyber Intelligence</string>
+    <string name="package_name">in.edu.klsvdit.yodhra</string>
+    <string name="custom_url_scheme">in.edu.klsvdit.yodhra</string>
+</resources>
