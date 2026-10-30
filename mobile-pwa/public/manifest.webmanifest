@@ -1,0 +1,26 @@
+{
+  "name": "YODHRA Cyber Intelligence",
+  "short_name": "YODHRA",
+  "description": "Unified campus cybersecurity assistant for URL inspection, phishing message analysis, and incident reporting.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080d18",
+  "theme_color": "#080d18",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo-icon.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["security", "education", "utilities"]
+}
+
