@@ -271,11 +271,18 @@ export interface QrAnalysisResult {
 // Feature 6: Institutional Trust Graph
 export interface InstitutionalIdentity {
   id: string;
-  unit_name: string;
-  official_domain: string;
-  official_email_patterns: string[];
+  name?: string;
+  unit_name?: string;
+  role_title?: string;
+  official_domain?: string;
+  verified_domain?: string;
+  official_email?: string;
+  official_phone?: string;
+  official_email_patterns?: string[];
   department: string;
-  is_verified: boolean;
+  official_portal_url?: string;
+  verified_payment_portal?: string;
+  is_verified?: boolean;
 }
 
 export interface TrustVerificationResult {
@@ -377,3 +384,111 @@ export interface LearningProgress {
   badges: string[];
   completed_module_slugs: string[];
 }
+
+// Emergency Red Alert Broadcast & Authenticated Device Relay
+export interface EmergencyAlert {
+  id: string;
+  institution_id: string;
+  campus_id: string;
+  department_id?: string;
+  target_zone: string;
+  category: string;
+  severity: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'ADVISORY';
+  title: string;
+  message: string;
+  action_instructions: string;
+  status: 'DRAFT' | 'APPROVED' | 'SENDING' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+  delivery_scope: 'PROXIMITY_MESH' | 'CAMPUS_WIDE' | 'INSTITUTION_WIDE' | 'DEPARTMENT_ONLY';
+  target_device_count: number;
+  acknowledged_count: number;
+  broadcast_by: string;
+  broadcast_by_role: string;
+  is_acknowledged?: boolean;
+  expires_at?: string;
+  created_at: string;
+}
+
+export interface BroadcastAlertPayload {
+  target_zone: string;
+  category: string;
+  title?: string;
+  message: string;
+  severity?: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'ADVISORY';
+  action_instructions?: string;
+  delivery_scope?: 'PROXIMITY_MESH' | 'CAMPUS_WIDE' | 'INSTITUTION_WIDE' | 'DEPARTMENT_ONLY';
+  expires_in_hours?: number;
+}
+
+export interface DeviceRegistration {
+  id: string;
+  user_id: string;
+  institution_id: string;
+  campus_id: string;
+  department_id: string;
+  device_platform: 'ios' | 'android' | 'web_pwa' | 'desktop_chrome' | 'macos' | 'windows';
+  device_name: string;
+  proximity_zone: string;
+  push_token?: string;
+  is_active: boolean;
+  last_active_at: string;
+  registered_at: string;
+}
+
+export interface RegisterDevicePayload {
+  device_id?: string;
+  device_platform?: string;
+  device_name: string;
+  proximity_zone?: string;
+  push_token?: string;
+}
+
+export interface AlertDeliveryMetric {
+  total_targeted: number;
+  delivered: number;
+  acknowledged: number;
+  pending: number;
+  by_platform: Record<string, number>;
+  deliveries_sample: Array<{
+    device_id: string;
+    status: string;
+    acknowledged_at?: string;
+  }>;
+}
+
+export interface UserGroup {
+  id: string;
+  department_id: string;
+  name: string;
+  role_type: string;
+  description: string;
+}
+
+export interface DepartmentNode {
+  id: string;
+  campus_id: string;
+  name: string;
+  code: string;
+  head_of_department: string;
+  user_groups: UserGroup[];
+  device_count: number;
+}
+
+export interface CampusNode {
+  id: string;
+  institution_id: string;
+  name: string;
+  code: string;
+  location: string;
+  departments: DepartmentNode[];
+}
+
+export interface InstitutionTree {
+  id: string;
+  name: string;
+  code: string;
+  domain: string;
+  campuses: CampusNode[];
+  total_devices: number;
+  total_alerts_active: number;
+}
+

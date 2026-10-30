@@ -55,12 +55,25 @@ export const RadarPage: React.FC = () => {
     if (!selectedZone) return;
     setBroadcasting(true);
     try {
-      await api.broadcastProximityAlert({
-        zone_id: selectedZone.id,
+      await api.broadcastEmergencyAlert({
+        target_zone: `${selectedZone.name} (${selectedZone.radius_meters}m Proximity Mesh)`,
         category: broadcastCategory,
-        severity: 'critical',
+        title: `EMERGENCY RED ALERT: ${broadcastCategory}`,
         message: broadcastMessage,
+        severity: 'CRITICAL',
+        action_instructions: 'Disconnect immediately from unverified networks or rogue APs. Verify official credentials on campus portal.',
+        delivery_scope: 'PROXIMITY_MESH',
       });
+      try {
+        await api.broadcastProximityAlert({
+          zone_id: selectedZone.id,
+          category: broadcastCategory,
+          severity: 'critical',
+          message: broadcastMessage,
+        });
+      } catch {
+        // ignore fallback
+      }
       setBroadcastSuccess(`🚨 RED ALERT dispatched to all devices within ${selectedZone.radius_meters}m of ${selectedZone.name}!`);
       setBroadcastModalOpen(false);
       // Refresh radar data

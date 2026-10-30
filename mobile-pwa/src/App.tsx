@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import BottomNav from './components/BottomNav';
+import { EmergencyAlertBanner } from './components/EmergencyAlertBanner';
 
 // Pages
 import WelcomePage from './pages/WelcomePage';
@@ -26,6 +27,9 @@ export default function App() {
     <AuthProvider>
       <Router>
         <div className="min-h-screen bg-[#0a0f1e] text-slate-100 flex flex-col font-sans selection:bg-teal-500 selection:text-slate-950">
+          {/* Emergency Campus Red Alert Broadcast Relay Banner */}
+          <EmergencyAlertBanner />
+
           <main className="flex-1">
             <Routes>
               {/* Root & Onboarding */}

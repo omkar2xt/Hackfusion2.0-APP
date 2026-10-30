@@ -17,6 +17,8 @@ from app.api.routes.trust_graph import router as trust_graph_router
 from app.api.routes.timeline import router as timeline_router
 from app.api.routes.coach import router as coach_router
 from app.api.routes.immune_system import router as immune_system_router
+from app.api.routes.devices import router as devices_router
+from app.api.routes.emergency_alerts import router as emergency_alerts_router
 
 
 @asynccontextmanager
@@ -70,6 +72,8 @@ app.include_router(trust_graph_router, prefix="/api/v1")
 app.include_router(timeline_router, prefix="/api/v1")
 app.include_router(coach_router, prefix="/api/v1")
 app.include_router(immune_system_router, prefix="/api/v1")
+app.include_router(devices_router, prefix="/api/v1")
+app.include_router(emergency_alerts_router, prefix="/api/v1")
 
 
 @app.get("/")

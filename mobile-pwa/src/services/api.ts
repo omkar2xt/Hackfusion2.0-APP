@@ -22,6 +22,12 @@ import type {
   LearningModule,
   QuizSubmissionResponse,
   LearningProgress,
+  EmergencyAlert,
+  BroadcastAlertPayload,
+  DeviceRegistration,
+  RegisterDevicePayload,
+  AlertDeliveryMetric,
+  InstitutionTree,
 } from '../types';
 
 class ApiService {
@@ -299,6 +305,73 @@ class ApiService {
 
   async getLearningProgress(): Promise<LearningProgress> {
     return this.request<LearningProgress>('/api/v1/coach/progress', {
+      method: 'GET',
+    });
+  }
+
+  // --- PART 3: Emergency Red Alert Broadcast & Authenticated Device Relay ---
+  async getActiveEmergencyAlerts(deviceId?: string): Promise<EmergencyAlert[]> {
+    const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
+    return this.request<EmergencyAlert[]>(`/api/v1/alerts/active${query}`, {
+      method: 'GET',
+    });
+  }
+
+  async broadcastEmergencyAlert(data: BroadcastAlertPayload): Promise<EmergencyAlert> {
+    return this.request<EmergencyAlert>('/api/v1/alerts/broadcast', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async acknowledgeEmergencyAlert(
+    alertId: string,
+    deviceId: string,
+    userNotes?: string
+  ): Promise<{ success: boolean; alert_id: string; ack_hash: string; total_acknowledged: number }> {
+    return this.request<{ success: boolean; alert_id: string; ack_hash: string; total_acknowledged: number }>(
+      `/api/v1/alerts/${encodeURIComponent(alertId)}/acknowledge`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ device_id: deviceId, user_notes: userNotes }),
+      }
+    );
+  }
+
+  async getAlertDeliveries(alertId: string): Promise<AlertDeliveryMetric> {
+    return this.request<AlertDeliveryMetric>(
+      `/api/v1/alerts/${encodeURIComponent(alertId)}/deliveries`,
+      {
+        method: 'GET',
+      }
+    );
+  }
+
+  async registerDevice(data: RegisterDevicePayload): Promise<DeviceRegistration> {
+    return this.request<DeviceRegistration>('/api/v1/devices/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getUserDevices(): Promise<DeviceRegistration[]> {
+    return this.request<DeviceRegistration[]>('/api/v1/devices', {
+      method: 'GET',
+    });
+  }
+
+  async revokeDevice(deviceId: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(
+      `/api/v1/devices/${encodeURIComponent(deviceId)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+  }
+
+  // --- PART 2: Hierarchical Database Tree Architecture ---
+  async getInstitutionalHierarchy(): Promise<InstitutionTree> {
+    return this.request<InstitutionTree>('/api/v1/alerts/hierarchy/tree', {
       method: 'GET',
     });
   }

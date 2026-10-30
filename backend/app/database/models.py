@@ -206,3 +206,113 @@ class LearningProgressModel(Base):
     completed = Column(Boolean, default=False)
     quiz_score = Column(Integer, default=0)
     completed_at = Column(DateTime, nullable=True)
+
+
+# =========================================================================
+# HIERARCHICAL DATABASE TREE ARCHITECTURE
+# =========================================================================
+
+class InstitutionModel(Base):
+    __tablename__ = "institutions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(200), nullable=False)
+    code = Column(String(50), nullable=False)
+    domain = Column(String(150), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CampusModel(Base):
+    __tablename__ = "campuses"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    institution_id = Column(String(36), nullable=False)
+    name = Column(String(200), nullable=False)
+    code = Column(String(50), nullable=False)
+    location = Column(String(200), default="Main Campus Grounds")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DepartmentModel(Base):
+    __tablename__ = "departments"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    campus_id = Column(String(36), nullable=False)
+    name = Column(String(200), nullable=False)
+    code = Column(String(50), nullable=False)
+    head_of_department = Column(String(150), default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserGroupModel(Base):
+    __tablename__ = "user_groups"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    department_id = Column(String(36), nullable=False)
+    name = Column(String(150), nullable=False)
+    role_type = Column(String(50), default="STUDENT")
+    description = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =========================================================================
+# AUTHENTICATED DEVICE REGISTRATION & PROXIMITY RELAY
+# =========================================================================
+
+class DeviceRegistrationModel(Base):
+    __tablename__ = "device_registrations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), nullable=False)
+    institution_id = Column(String(36), default="inst-apex-01")
+    campus_id = Column(String(36), default="camp-main-01")
+    department_id = Column(String(36), default="dept-cs-01")
+    device_platform = Column(String(50), default="web_pwa")  # ios, android, web_pwa, desktop_chrome
+    device_name = Column(String(150), nullable=False)
+    push_token = Column(Text, nullable=True)
+    ip_address = Column(String(64), nullable=True)
+    proximity_zone = Column(String(150), default="Engineering & CS Quad (150m Proximity Mesh)")
+    is_active = Column(Boolean, default=True)
+    last_active_at = Column(DateTime, default=datetime.utcnow)
+    registered_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =========================================================================
+# EMERGENCY RED ALERT BROADCAST & DELIVERY TRACKING
+# =========================================================================
+
+class EmergencyAlertModel(Base):
+    __tablename__ = "emergency_alerts"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    institution_id = Column(String(36), default="inst-apex-01")
+    campus_id = Column(String(36), default="camp-main-01")
+    department_id = Column(String(36), nullable=True)
+    target_zone = Column(String(150), nullable=False)
+    category = Column(String(100), nullable=False)
+    severity = Column(String(30), default="CRITICAL")  # CRITICAL, HIGH, ELEVATED
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    action_instructions = Column(Text, default="")
+    status = Column(String(30), default="ACTIVE")  # DRAFT, APPROVED, SENDING, ACTIVE, EXPIRED, CANCELLED
+    delivery_scope = Column(String(50), default="PROXIMITY_MESH")  # PROXIMITY_MESH, CAMPUS_WIDE, INSTITUTION_WIDE
+    target_device_count = Column(Integer, default=0)
+    acknowledged_count = Column(Integer, default=0)
+    broadcast_by = Column(String(150), default="Campus Security Operations")
+    broadcast_by_role = Column(String(50), default="security_admin")
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AlertDeliveryModel(Base):
+    __tablename__ = "alert_deliveries"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    alert_id = Column(String(36), nullable=False)
+    device_id = Column(String(36), nullable=False)
+    user_id = Column(String(36), nullable=False)
+    delivery_status = Column(String(30), default="QUEUED")  # QUEUED, ACCEPTED, ACKNOWLEDGED, FAILED
+    delivered_at = Column(DateTime, nullable=True)
+    acknowledged_at = Column(DateTime, nullable=True)
+    device_ack_hash = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

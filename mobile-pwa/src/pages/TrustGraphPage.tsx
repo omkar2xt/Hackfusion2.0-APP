@@ -186,20 +186,32 @@ export const TrustGraphPage: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {identities.map((id) => (
+                {identities.map((id: any) => (
                   <div key={id.id} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-teal-500/40 transition space-y-2 shadow-md">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm text-slate-100 truncate">{id.unit_name}</span>
+                      <span className="font-semibold text-sm text-slate-100 truncate">
+                        {id.unit_name || id.name || 'Campus Authority'}
+                      </span>
                       <span className="flex items-center gap-1 text-[10px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-500/30 font-medium shrink-0">
                         <CheckCircle className="w-3 h-3" /> Official
                       </span>
                     </div>
                     <div className="text-xs text-slate-400">
-                      Domain: <span className="text-teal-300 font-mono text-xs">{id.official_domain}</span>
+                      Domain: <span className="text-teal-300 font-mono text-xs font-semibold">{id.official_domain || id.verified_domain || 'campus.edu'}</span>
                     </div>
-                    <div className="text-xs text-slate-500">
-                      Department: {id.department}
+                    <div className="text-xs text-slate-400">
+                      Department: <span className="text-slate-200">{id.department}</span> {id.role_title ? `• ${id.role_title}` : ''}
                     </div>
+                    {id.official_email && (
+                      <div className="text-[11px] text-slate-500 font-mono">
+                        Contact: <span className="text-slate-300">{id.official_email}</span>
+                      </div>
+                    )}
+                    {(id.official_portal_url || id.verified_payment_portal) && (
+                      <div className="text-[11px] text-teal-400/90 truncate pt-1 border-t border-slate-800/60">
+                        Portal: <a href={id.official_portal_url || id.verified_payment_portal} target="_blank" rel="noreferrer" className="hover:underline">{id.official_portal_url || id.verified_payment_portal}</a>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

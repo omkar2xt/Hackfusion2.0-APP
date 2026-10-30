@@ -85,11 +85,13 @@ class TrustGraphService:
             InstitutionalIdentityResponse(
                 id=item.id,
                 name=item.name,
+                unit_name=item.name,
                 role_title=item.role_title,
                 department=item.department,
                 official_email=item.official_email,
                 official_phone=item.official_phone or "",
                 verified_domain=item.verified_domain,
+                official_domain=item.verified_domain,
                 official_portal_url=item.official_portal_url or "",
                 verified_payment_portal=item.verified_payment_portal or "",
                 is_active=item.is_active,
