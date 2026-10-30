@@ -60,3 +60,4 @@ Interactive Swagger documentation is available at **http://localhost:8000/docs**
 2. **Explainable Threat Engine:** Real heuristic parsing (IP host, punycode, unusual ports, brand spoofing, urgency traps, credential harvesting patterns).
 3. **Multi-Tenant Access Control:** Incidents are protected by user ownership; only security administrators can modify triage states.
 4. **CORS:** Configured for local development (`http://localhost:5173`) and Vercel production preview URLs (`*.vercel.app`).
+

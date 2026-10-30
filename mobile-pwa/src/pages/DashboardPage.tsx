@@ -11,6 +11,10 @@ import {
   Clock,
   ArrowRight,
   ExternalLink,
+  Radio,
+  Dna,
+  GitFork,
+  Award,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../services/api';
@@ -206,6 +210,64 @@ export default function DashboardPage() {
               color="amber"
               onClick={() => navigate('/report')}
             />
+          </div>
+        </div>
+
+        {/* Innovation Features & Intelligence Hub */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-teal-400">
+              Campus Intelligence Hub
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div
+              onClick={() => navigate('/radar')}
+              className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 cursor-pointer transition space-y-1"
+            >
+              <div className="flex items-center justify-between">
+                <Radio className="w-5 h-5 text-teal-400" />
+                <span className="text-[10px] uppercase font-bold text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">Live</span>
+              </div>
+              <h3 className="font-bold text-xs text-slate-100">Cyber Radar</h3>
+              <p className="text-[11px] text-slate-400">Campus trends & exposure</p>
+            </div>
+
+            <div
+              onClick={() => navigate('/threat-dna')}
+              className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 cursor-pointer transition space-y-1"
+            >
+              <div className="flex items-center justify-between">
+                <Dna className="w-5 h-5 text-cyan-400" />
+                <span className="text-[10px] uppercase font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">DNA</span>
+              </div>
+              <h3 className="font-bold text-xs text-slate-100">Attack DNA</h3>
+              <p className="text-[11px] text-slate-400">Campaign correlation</p>
+            </div>
+
+            <div
+              onClick={() => navigate('/trust-graph')}
+              className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 cursor-pointer transition space-y-1"
+            >
+              <div className="flex items-center justify-between">
+                <GitFork className="w-5 h-5 text-teal-300" />
+                <span className="text-[10px] uppercase font-bold text-teal-300 bg-teal-500/10 px-1.5 py-0.5 rounded">Auth</span>
+              </div>
+              <h3 className="font-bold text-xs text-slate-100">Trust Graph</h3>
+              <p className="text-[11px] text-slate-400">Campus sender directory</p>
+            </div>
+
+            <div
+              onClick={() => navigate('/coach')}
+              className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 cursor-pointer transition space-y-1"
+            >
+              <div className="flex items-center justify-between">
+                <Award className="w-5 h-5 text-amber-400" />
+                <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">Coach</span>
+              </div>
+              <h3 className="font-bold text-xs text-slate-100">Safety Coach</h3>
+              <p className="text-[11px] text-slate-400">Interactive micro-quizzes</p>
+            </div>
           </div>
         </div>
 

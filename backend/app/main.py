@@ -10,6 +10,13 @@ from app.api.routes.health import router as health_router
 from app.api.routes.scan import router as scan_router
 from app.api.routes.incidents import router as incidents_router
 from app.api.routes.dashboard import router as dashboard_router
+from app.api.routes.threat_dna import router as threat_dna_router
+from app.api.routes.cyber_radar import router as cyber_radar_router
+from app.api.routes.qr_guardian import router as qr_guardian_router
+from app.api.routes.trust_graph import router as trust_graph_router
+from app.api.routes.timeline import router as timeline_router
+from app.api.routes.coach import router as coach_router
+from app.api.routes.immune_system import router as immune_system_router
 
 
 @asynccontextmanager
@@ -56,6 +63,13 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(scan_router, prefix="/api/v1")
 app.include_router(incidents_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(threat_dna_router, prefix="/api/v1")
+app.include_router(cyber_radar_router, prefix="/api/v1")
+app.include_router(qr_guardian_router, prefix="/api/v1")
+app.include_router(trust_graph_router, prefix="/api/v1")
+app.include_router(timeline_router, prefix="/api/v1")
+app.include_router(coach_router, prefix="/api/v1")
+app.include_router(immune_system_router, prefix="/api/v1")
 
 
 @app.get("/")

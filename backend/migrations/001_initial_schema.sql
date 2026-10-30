@@ -97,3 +97,4 @@ CREATE POLICY "Users can insert incidents" ON public.incidents
 CREATE INDEX IF NOT EXISTS idx_scans_checked_at ON public.scans(checked_at DESC);
 CREATE INDEX IF NOT EXISTS idx_incidents_status ON public.incidents(status);
 CREATE INDEX IF NOT EXISTS idx_incidents_user_id ON public.incidents(user_id);
+

@@ -8,6 +8,20 @@ import type {
   DashboardStats,
   User,
   ApiError,
+  ThreatFingerprint,
+  ThreatCampaign,
+  CyberRadarOverview,
+  ExposureIntelligence,
+  VerifiedQrDestination,
+  QrAnalysisResult,
+  InstitutionalIdentity,
+  TrustVerificationResult,
+  CampusWarning,
+  TimelineEvent,
+  EvidenceExportPackage,
+  LearningModule,
+  QuizSubmissionResponse,
+  LearningProgress,
 } from '../types';
 
 class ApiService {
@@ -86,6 +100,7 @@ class ApiService {
     return response.json() as Promise<T>;
   }
 
+  // --- Core Scans ---
   async scanUrl(data: ScanUrlRequest): Promise<ScanResult> {
     return this.request<ScanResult>('/api/v1/scan/url', {
       method: 'POST',
@@ -107,6 +122,7 @@ class ApiService {
     });
   }
 
+  // --- Incidents ---
   async createIncident(data: CreateIncidentRequest): Promise<Incident> {
     return this.request<Incident>('/api/v1/incidents', {
       method: 'POST',
@@ -126,6 +142,7 @@ class ApiService {
     });
   }
 
+  // --- Dashboard & Profile ---
   async getDashboardStats(): Promise<DashboardStats> {
     return this.request<DashboardStats>('/api/v1/dashboard/stats', {
       method: 'GET',
@@ -142,6 +159,113 @@ class ApiService {
     return this.request<User>('/api/v1/users/me', {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  }
+
+  // --- Feature 1: Threat DNA Engine ---
+  async analyzeThreatDna(data: { raw_content: string; content_type: string; sender?: string }): Promise<ThreatFingerprint> {
+    return this.request<ThreatFingerprint>('/api/v1/threat-dna/analyze', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getThreatCampaigns(): Promise<ThreatCampaign[]> {
+    return this.request<ThreatCampaign[]>('/api/v1/threat-dna/campaigns', {
+      method: 'GET',
+    });
+  }
+
+  async getThreatCampaign(id: string): Promise<ThreatCampaign> {
+    return this.request<ThreatCampaign>(`/api/v1/threat-dna/campaigns/${encodeURIComponent(id)}`, {
+      method: 'GET',
+    });
+  }
+
+  // --- Feature 2 & 3: Cyber Radar & Exposure Intelligence ---
+  async getCyberRadarOverview(): Promise<CyberRadarOverview> {
+    return this.request<CyberRadarOverview>('/api/v1/cyber-radar/overview', {
+      method: 'GET',
+    });
+  }
+
+  async getExposureIntelligence(): Promise<ExposureIntelligence> {
+    return this.request<ExposureIntelligence>('/api/v1/cyber-radar/exposure', {
+      method: 'GET',
+    });
+  }
+
+  // --- Feature 4: QR Guardian ---
+  async analyzeQrGuardian(data: { raw_qr_content: string }): Promise<QrAnalysisResult> {
+    return this.request<QrAnalysisResult>('/api/v1/qr/analyze', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getVerifiedQrDestinations(): Promise<VerifiedQrDestination[]> {
+    return this.request<VerifiedQrDestination[]>('/api/v1/qr/verified-destinations', {
+      method: 'GET',
+    });
+  }
+
+  // --- Feature 6: Institutional Trust Graph ---
+  async getInstitutionalIdentities(): Promise<InstitutionalIdentity[]> {
+    return this.request<InstitutionalIdentity[]>('/api/v1/trust-graph/identities', {
+      method: 'GET',
+    });
+  }
+
+  async verifyTrustGraph(data: { claimed_sender: string; sender_domain?: string }): Promise<TrustVerificationResult> {
+    return this.request<TrustVerificationResult>('/api/v1/trust-graph/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // --- Feature 7: Campus Cyber Immune System ---
+  async getCampusWarnings(): Promise<CampusWarning[]> {
+    return this.request<CampusWarning[]>('/api/v1/immune/warnings', {
+      method: 'GET',
+    });
+  }
+
+  // --- Feature 9: Evidence Timeline & Export ---
+  async getIncidentTimeline(incidentId: string): Promise<TimelineEvent[]> {
+    return this.request<TimelineEvent[]>(`/api/v1/incidents/${encodeURIComponent(incidentId)}/timeline`, {
+      method: 'GET',
+    });
+  }
+
+  async exportIncidentEvidence(incidentId: string): Promise<EvidenceExportPackage> {
+    return this.request<EvidenceExportPackage>(`/api/v1/incidents/${encodeURIComponent(incidentId)}/export`, {
+      method: 'GET',
+    });
+  }
+
+  // --- Feature 10: Adaptive Cyber Safety Coach ---
+  async getLearningModules(): Promise<LearningModule[]> {
+    return this.request<LearningModule[]>('/api/v1/coach/modules', {
+      method: 'GET',
+    });
+  }
+
+  async getLearningModule(slug: string): Promise<LearningModule> {
+    return this.request<LearningModule>(`/api/v1/coach/modules/${encodeURIComponent(slug)}`, {
+      method: 'GET',
+    });
+  }
+
+  async submitQuiz(data: { module_slug: string; answers: Record<string, number> }): Promise<QuizSubmissionResponse> {
+    return this.request<QuizSubmissionResponse>('/api/v1/coach/quiz/submit', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getLearningProgress(): Promise<LearningProgress> {
+    return this.request<LearningProgress>('/api/v1/coach/progress', {
+      method: 'GET',
     });
   }
 }

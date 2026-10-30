@@ -10,3 +10,4 @@ class DashboardStatsResponse(BaseModel):
     reported_incidents: int
     recent_scans: List[ScanResultResponse]
     recent_incidents: List[IncidentResponse]
+

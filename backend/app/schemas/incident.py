@@ -44,3 +44,4 @@ class IncidentResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+

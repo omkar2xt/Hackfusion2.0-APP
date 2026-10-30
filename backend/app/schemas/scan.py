@@ -34,3 +34,4 @@ class ScanResultResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+

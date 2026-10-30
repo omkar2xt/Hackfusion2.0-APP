@@ -15,6 +15,12 @@ import MyReportsPage from './pages/MyReportsPage';
 import IncidentDetailPage from './pages/IncidentDetailPage';
 import ProfilePage from './pages/ProfilePage';
 
+// Innovation Feature Pages
+import { RadarPage } from './pages/RadarPage';
+import { ThreatDnaPage } from './pages/ThreatDnaPage';
+import { TrustGraphPage } from './pages/TrustGraphPage';
+import { CoachPage } from './pages/CoachPage';
+
 export default function App() {
   return (
     <AuthProvider>
@@ -36,6 +42,13 @@ export default function App() {
               <Route path="/reports" element={<MyReportsPage />} />
               <Route path="/reports/:id" element={<IncidentDetailPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+
+              {/* Innovation Features */}
+              <Route path="/radar" element={<RadarPage />} />
+              <Route path="/threat-dna" element={<ThreatDnaPage />} />
+              <Route path="/campaigns" element={<ThreatDnaPage />} />
+              <Route path="/trust-graph" element={<TrustGraphPage />} />
+              <Route path="/coach" element={<CoachPage />} />
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

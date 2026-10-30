@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import { useIncidents } from '../hooks/useIncidents';
+import { saveOfflineIncident } from '../utils/offlineQueue';
 import type { IncidentCategory } from '../types';
 
 interface LocationState {
@@ -49,6 +50,18 @@ export default function ReportPage() {
     }
 
     try {
+      if (!navigator.onLine) {
+        // Feature 8: Offline Cyber Safety Mode
+        const draft = saveOfflineIncident({
+          category,
+          severity,
+          description: descTrimmed,
+          suspicious_content: suspiciousContent.trim() || undefined,
+        });
+        setSubmittedId(draft.local_id);
+        return;
+      }
+
       const created = await createIncident({
         category,
         severity,
@@ -58,7 +71,15 @@ export default function ReportPage() {
 
       setSubmittedId(created.id);
     } catch (err: any) {
-      console.error('Incident report submission error:', err);
+      console.warn('Network submission failed, saving to offline incident queue:', err);
+      // Graceful offline fallback
+      const draft = saveOfflineIncident({
+        category,
+        severity,
+        description: descTrimmed,
+        suspicious_content: suspiciousContent.trim() || undefined,
+      });
+      setSubmittedId(draft.local_id);
     }
   };
 

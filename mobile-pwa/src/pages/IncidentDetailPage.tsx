@@ -4,20 +4,26 @@ import {
   AlertTriangle,
   ShieldCheck,
   Calendar,
+  Download,
+  Clock,
+  CheckCircle,
 } from 'lucide-react';
 import Header from '../components/Header';
 import IncidentTimeline from '../components/IncidentTimeline';
 import StatusBadge from '../components/StatusBadge';
 import { api } from '../services/api';
-import type { Incident } from '../types';
+import type { Incident, TimelineEvent, EvidenceExportPackage } from '../types';
 import { formatDate } from '../utils/helpers';
 
 export default function IncidentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [incident, setIncident] = useState<Incident | null>(null);
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportedPackage, setExportedPackage] = useState<EvidenceExportPackage | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -25,8 +31,12 @@ export default function IncidentDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await api.getIncident(id);
-        setIncident(data);
+        const [incData, eventsData] = await Promise.all([
+          api.getIncident(id),
+          api.getIncidentTimeline(id).catch(() => []),
+        ]);
+        setIncident(incData);
+        setTimelineEvents(eventsData);
       } catch (err: any) {
         console.error('Failed to fetch incident detail:', err);
         setError(err.message || 'Unable to retrieve incident details.');
@@ -36,6 +46,30 @@ export default function IncidentDetailPage() {
     };
     fetchDetail();
   }, [id]);
+
+  const handleExportEvidence = async () => {
+    if (!id) return;
+    setExporting(true);
+    try {
+      const data = await api.exportIncidentEvidence(id);
+      setExportedPackage(data);
+
+      // Trigger automatic file download of the digitally signed package
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SignalSafe_Evidence_Incident_${id.slice(0, 8)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.message || 'Failed to generate digital evidence package');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-slate-100 pb-24">
@@ -86,6 +120,31 @@ export default function IncidentDetailPage() {
                 <IncidentTimeline currentStatus={incident.status} />
               </div>
             </div>
+
+            {/* Feature 9: Evidence Audit Trail & Timeline */}
+            {timelineEvents.length > 0 && (
+              <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-400">
+                  <Clock size={14} />
+                  <span>Immutable Audit Trail</span>
+                </div>
+                <div className="space-y-2">
+                  {timelineEvents.map((ev) => (
+                    <div key={ev.id} className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs flex items-start gap-2.5">
+                      <CheckCircle size={14} className="text-teal-400 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-0.5 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-200 capitalize">{ev.event_type.replace('_', ' ')}</span>
+                          <span className="text-[10px] text-slate-500">{formatDate(ev.timestamp)}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400">{ev.details}</p>
+                        <span className="text-[10px] text-slate-500 font-mono">Actor: {ev.actor}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Incident Metadata */}
             <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
@@ -143,6 +202,39 @@ export default function IncidentDetailPage() {
                 </p>
               </div>
             )}
+
+            {/* Tamper-Evident Evidence Export (Feature 9) */}
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-100">Evidence Integrity Package</h4>
+                  <p className="text-[11px] text-slate-400">Cryptographic SHA-256 signed audit export for forensic review</p>
+                </div>
+              </div>
+
+              {exportedPackage && (
+                <div className="p-3 rounded-xl bg-slate-950 border border-teal-500/30 space-y-1 text-xs">
+                  <div className="flex items-center gap-1.5 text-teal-400 font-bold">
+                    <CheckCircle size={14} /> Digital Signature Verified
+                  </div>
+                  <div className="font-mono text-[10px] text-slate-400 break-all">
+                    Hash: {exportedPackage.digital_signature.hash}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Standard: {exportedPackage.digital_signature.verification_standard}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={handleExportEvidence}
+                disabled={exporting}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-teal-300 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-2 border border-slate-700"
+              >
+                <Download size={14} />
+                <span>{exporting ? 'Generating Signature...' : 'Download Tamper-Evident Evidence Package'}</span>
+              </button>
+            </div>
           </div>
         )}
       </div>

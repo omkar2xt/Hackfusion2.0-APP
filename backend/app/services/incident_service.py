@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.database.models import IncidentModel, AuditLogModel
 from app.schemas.incident import CreateIncidentRequest, UpdateIncidentStatusRequest
+from app.services.timeline_service import timeline_service
+from app.services.threat_dna_service import threat_dna_service
 
 
 class IncidentService:
@@ -37,9 +39,45 @@ class IncidentService:
             created_at=datetime.utcnow()
         )
         db.add(audit)
-
         db.commit()
         db.refresh(incident)
+
+        # 1. Record creation in immutable timeline (Feature 9)
+        timeline_service.record_event(
+            db=db,
+            incident_id=incident.id,
+            event_type="CREATED",
+            description=f"Incident report logged by campus member under category '{incident.category}' (Severity: {incident.severity.upper()}).",
+            actor_id=user_id,
+            metadata_json={"category": incident.category, "severity": incident.severity}
+        )
+
+        # 2. Correlate with Campus Cyberattack DNA engine (Feature 1 & 7)
+        try:
+            correlation = threat_dna_service.process_and_correlate(
+                db=db,
+                incident_id=incident.id,
+                scan_id=None,
+                content=incident.description,
+                target_url=incident.suspicious_content,
+                claimed_sender=None
+            )
+            if correlation.get("correlated_campaign_id"):
+                timeline_service.record_event(
+                    db=db,
+                    incident_id=incident.id,
+                    event_type="CAMPAIGN_LINKED",
+                    description=f"Automated threat DNA correlation matched Campaign '{correlation['campaign_name']}' (Similarity: {int(correlation['similarity_score'] * 100)}%).",
+                    actor_id="DNA_ENGINE",
+                    metadata_json={
+                        "campaign_id": correlation["correlated_campaign_id"],
+                        "similarity_score": correlation["similarity_score"],
+                        "match_reasons": correlation["match_reasons"]
+                    }
+                )
+        except Exception as e:
+            print(f"[ThreatDNA] Correlation non-fatal error: {e}")
+
         return incident
 
     @staticmethod
@@ -93,9 +131,19 @@ class IncidentService:
             created_at=datetime.utcnow()
         )
         db.add(audit)
-
         db.commit()
         db.refresh(incident)
+
+        # Record timeline event (Feature 9)
+        timeline_service.record_event(
+            db=db,
+            incident_id=incident.id,
+            event_type="STATUS_CHANGE",
+            description=f"Status advanced from '{old_status.upper()}' to '{incident.status.upper()}'. Notes: {incident.resolution_notes or 'No notes provided'}",
+            actor_id=actor_id,
+            metadata_json={"old_status": old_status, "new_status": incident.status}
+        )
+
         return incident
 
 
