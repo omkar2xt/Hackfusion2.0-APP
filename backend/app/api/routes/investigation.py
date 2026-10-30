@@ -104,3 +104,4 @@ def generate_report(
 ):
     """Generates a structured, exportable forensic investigation report."""
     return investigation_service.generate_investigation_report(db, incident_id)
+

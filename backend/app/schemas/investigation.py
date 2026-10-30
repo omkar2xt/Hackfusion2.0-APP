@@ -173,3 +173,4 @@ class InvestigationReport(BaseModel):
     attribution: AttributionItem
     recommended_containment_steps: List[str] = []
     investigation_status: str  # OPEN, TRIAGED, CONTAINED, CLOSED
+

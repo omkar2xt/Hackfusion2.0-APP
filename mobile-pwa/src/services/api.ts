@@ -36,6 +36,11 @@ import type {
   IncidentCorrelationItem,
   AttributionItem,
   InvestigationReport,
+  UserProfile,
+  UserProfileUpdate,
+  UserSession,
+  RolePermissionMatrix,
+  AuditLog,
 } from '../types';
 
 class ApiService {
@@ -249,10 +254,11 @@ class ApiService {
   }
 
   // --- Feature 4: QR Guardian ---
-  async analyzeQrGuardian(data: { raw_qr_content: string }): Promise<QrAnalysisResult> {
+  async analyzeQrGuardian(data: { raw_qr_content?: string; decoded_content?: string }): Promise<QrAnalysisResult> {
+    const content = data.decoded_content || data.raw_qr_content || '';
     return this.request<QrAnalysisResult>('/api/v1/qr/analyze', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ decoded_content: content }),
     });
   }
 
@@ -490,6 +496,75 @@ class ApiService {
   async getInvestigationReport(incidentId: string): Promise<InvestigationReport> {
     return this.request<InvestigationReport>(`/api/v1/investigation/report/${encodeURIComponent(incidentId)}`, {
       method: 'GET',
+    });
+  }
+
+  // --- PART 5: IAM, Personal Profile, Hierarchy, Sessions & RBAC ---
+  async getIamProfile(): Promise<UserProfile> {
+    return this.request<UserProfile>('/api/v1/iam/profile', {
+      method: 'GET',
+    });
+  }
+
+  async updateIamProfile(data: UserProfileUpdate): Promise<UserProfile> {
+    return this.request<UserProfile>('/api/v1/iam/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async changePassword(data: { current_password: string; new_password: string }): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>('/api/v1/iam/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getUserSessions(): Promise<UserSession[]> {
+    return this.request<UserSession[]>('/api/v1/iam/sessions', {
+      method: 'GET',
+    });
+  }
+
+  async revokeUserSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/api/v1/iam/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getRolePermissionMatrix(): Promise<RolePermissionMatrix> {
+    return this.request<RolePermissionMatrix>('/api/v1/iam/roles/matrix', {
+      method: 'GET',
+    });
+  }
+
+  async assignUserRole(data: {
+    target_user_id: string;
+    target_user_email: string;
+    new_role: string;
+    reason?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>('/api/v1/iam/roles/assign', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAuditLogs(): Promise<AuditLog[]> {
+    return this.request<AuditLog[]>('/api/v1/iam/audit-logs', {
+      method: 'GET',
+    });
+  }
+
+  async createDepartment(data: {
+    campus_id?: string;
+    name: string;
+    code: string;
+    head_of_department: string;
+  }): Promise<{ success: boolean; department_id: string; name: string }> {
+    return this.request<{ success: boolean; department_id: string; name: string }>('/api/v1/iam/departments', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 }

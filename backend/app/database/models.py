@@ -413,3 +413,46 @@ class IncidentCorrelationModel(Base):
     reason = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
+# =========================================================================
+# IDENTITY & ACCESS MANAGEMENT (IAM), PROFILES, SESSIONS & AUDITING
+# =========================================================================
+
+class UserProfileModel(Base):
+    __tablename__ = "user_profiles"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), unique=True, nullable=False)
+    full_name = Column(String(150), nullable=False)
+    email = Column(String(150), unique=True, nullable=False)
+    phone_number = Column(String(30), default="+91 98450 12345")
+    employee_or_student_id = Column(String(50), default="VDIT-CS-2024-042")
+    designation = Column(String(100), default="Senior Cybersecurity Analyst")
+    institution_id = Column(String(36), default="inst-kls-01")
+    campus_id = Column(String(36), default="camp-vdit-01")
+    department_id = Column(String(36), default="dept-cse-01")
+    role = Column(String(50), default="Security Analyst")  # Student, Faculty, Department Coordinator, Campus Security Officer, Security Analyst, Institution Administrator, Super Administrator
+    account_status = Column(String(30), default="ACTIVE")  # ACTIVE, SUSPENDED, PENDING_VERIFICATION
+    avatar_url = Column(Text, default="")
+    mfa_enabled = Column(Boolean, default=True)
+    last_login_at = Column(DateTime, default=datetime.utcnow)
+    failed_login_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserSessionModel(Base):
+    __tablename__ = "user_sessions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), nullable=False)
+    device_name = Column(String(150), nullable=False)
+    device_platform = Column(String(50), default="web_pwa")  # windows, macos, android, ios
+    ip_address = Column(String(64), default="10.10.9.33")
+    location_city = Column(String(100), default="Haliyal, Karnataka (Campus Network)")
+    user_agent = Column(Text, default="")
+    is_active = Column(Boolean, default=True)
+    last_active_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+

@@ -410,3 +410,4 @@ class UrlIntelligenceService:
 
 
 url_intelligence_service = UrlIntelligenceService()
+

@@ -281,3 +281,4 @@ class QrIntelligenceService:
 
 
 qr_intelligence_service = QrIntelligenceService()
+

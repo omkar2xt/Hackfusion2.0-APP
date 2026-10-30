@@ -228,6 +228,18 @@ export default function QrScannerPage() {
     await scanQr(trimmed);
   };
 
+  const handleSimulateScan = async (samplePayload: string) => {
+    await stopCamera();
+    playScanChime();
+    if (navigator.vibrate) {
+      navigator.vibrate([70, 35, 70]);
+    }
+    setScanSuccessFeedback(true);
+    setDecodedContent(samplePayload);
+    api.analyzeQrGuardian({ decoded_content: samplePayload }).then(setQrGuardianResult).catch(() => {});
+    await scanQr(samplePayload);
+  };
+
   const handleReport = (scanResult: ScanResult) => {
     navigate('/report', {
       state: {
@@ -438,6 +450,60 @@ export default function QrScannerPage() {
           </div>
         )}
 
+        {/* ONE-TAP QR SANDBOX SIMULATIONS (LAB & DESKTOP TEST SUITE) */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E9ED] space-y-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#202A35] flex items-center gap-1.5">
+              <Zap size={15} className="text-[#315E63]" />
+              <span>One-Tap QR Sandbox Simulations</span>
+            </span>
+            <span className="text-[10px] text-[#64748B] font-medium">Precision Test Suite</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <button
+              onClick={() => handleSimulateScan('https://klsvdit.edu.in/portal/students')}
+              type="button"
+              className="p-3 rounded-xl border border-[#27845A]/30 bg-[#27845A]/5 hover:bg-[#27845A]/10 text-left transition cursor-pointer"
+            >
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#27845A]">
+                <CheckCircle2 size={13} />
+                <span>Verified Campus Portal</span>
+              </div>
+              <span className="text-[10px] text-[#64748B] truncate block mt-0.5 font-mono">
+                klsvdit.edu.in/portal
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleSimulateScan('http://192.168.1.1/kls-sso-login')}
+              type="button"
+              className="p-3 rounded-xl border border-[#C58A35]/30 bg-[#C58A35]/5 hover:bg-[#C58A35]/10 text-left transition cursor-pointer"
+            >
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#C58A35]">
+                <AlertTriangle size={13} />
+                <span>Rogue Wi-Fi AP Phish</span>
+              </div>
+              <span className="text-[10px] text-[#64748B] truncate block mt-0.5 font-mono">
+                192.168.1.1/kls-sso
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleSimulateScan('https://free-campus-wifi.ru/auth-login')}
+              type="button"
+              className="p-3 rounded-xl border border-[#C74747]/30 bg-[#C74747]/5 hover:bg-[#C74747]/10 text-left transition cursor-pointer"
+            >
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#C74747]">
+                <AlertTriangle size={13} />
+                <span>Malicious Sticker QR</span>
+              </div>
+              <span className="text-[10px] text-[#64748B] truncate block mt-0.5 font-mono">
+                free-campus-wifi.ru
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* Manual Fallback View */}
         {activeMode === 'manual' && (
           <div className="bg-white rounded-2xl border border-[#E5E9ED] p-5 space-y-4 shadow-sm">
@@ -505,6 +571,16 @@ export default function QrScannerPage() {
               <span>For campus safety, YODHRA never auto-opens decoded QR links without sandbox verification.</span>
             </div>
 
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <button
+                onClick={() => navigate('/investigation', { state: { rawQr: decodedContent, initialTab: 'qr' } })}
+                className="px-3.5 py-2 bg-[#315E63] hover:bg-[#274c50] text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Search size={13} />
+                <span>Deep Investigate in SOC Engine</span>
+              </button>
+            </div>
+
             {/* QR Guardian Registry Match */}
             {qrGuardianResult && (
               <div
@@ -538,6 +614,60 @@ export default function QrScannerPage() {
             )}
           </div>
         )}
+
+        {/* ONE-TAP QR SANDBOX SIMULATIONS (LAB & DESKTOP TEST SUITE) */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E9ED] space-y-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#202A35] flex items-center gap-1.5">
+              <Zap size={15} className="text-[#315E63]" />
+              <span>One-Tap QR Sandbox Simulations</span>
+            </span>
+            <span className="text-[10px] text-[#64748B] font-medium">Precision Test Suite</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <button
+              onClick={() => handleSimulateScan('https://klsvdit.edu.in/portal/students')}
+              type="button"
+              className="p-3 rounded-xl border border-[#27845A]/30 bg-[#27845A]/5 hover:bg-[#27845A]/10 text-left transition cursor-pointer"
+            >
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#27845A]">
+                <CheckCircle2 size={13} />
+                <span>Verified Campus Portal</span>
+              </div>
+              <span className="text-[10px] text-[#64748B] truncate block mt-0.5 font-mono">
+                klsvdit.edu.in/portal
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleSimulateScan('http://192.168.1.1/kls-sso-login')}
+              type="button"
+              className="p-3 rounded-xl border border-[#C58A35]/30 bg-[#C58A35]/5 hover:bg-[#C58A35]/10 text-left transition cursor-pointer"
+            >
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#C58A35]">
+                <AlertTriangle size={13} />
+                <span>Rogue Wi-Fi AP Phish</span>
+              </div>
+              <span className="text-[10px] text-[#64748B] truncate block mt-0.5 font-mono">
+                192.168.1.1/kls-sso
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleSimulateScan('https://free-campus-wifi.ru/auth-login')}
+              type="button"
+              className="p-3 rounded-xl border border-[#C74747]/30 bg-[#C74747]/5 hover:bg-[#C74747]/10 text-left transition cursor-pointer"
+            >
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#C74747]">
+                <AlertTriangle size={13} />
+                <span>Malicious Sticker QR</span>
+              </div>
+              <span className="text-[10px] text-[#64748B] truncate block mt-0.5 font-mono">
+                free-campus-wifi.ru
+              </span>
+            </button>
+          </div>
+        </div>
 
         {/* API Error State */}
         {apiError && (

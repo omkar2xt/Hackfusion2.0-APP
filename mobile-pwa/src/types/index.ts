@@ -681,5 +681,68 @@ export interface InvestigationReport {
   investigation_status: string;
 }
 
+// --- PART 5: IAM, Profiles, Sessions, Hierarchy & RBAC ---
+export interface UserProfile {
+  user_id: string;
+  full_name: string;
+  email: string;
+  phone_number: string;
+  employee_or_student_id: string;
+  designation: string;
+  institution_name: string;
+  campus_name: string;
+  department_name: string;
+  role: string;
+  account_status: string;
+  avatar_url?: string;
+  mfa_enabled: boolean;
+  last_login_at?: string | null;
+  failed_login_count: number;
+}
+
+export interface UserProfileUpdate {
+  full_name?: string;
+  phone_number?: string;
+  designation?: string;
+  avatar_url?: string;
+}
+
+export interface UserSession {
+  id: string;
+  user_id: string;
+  device_name: string;
+  device_platform: string;
+  ip_address: string;
+  location_city: string;
+  user_agent?: string;
+  is_active: boolean;
+  last_active_at: string;
+  created_at: string;
+}
+
+export interface RolePermissions {
+  role_name: string;
+  description: string;
+  permissions: string[];
+  user_count: number;
+}
+
+export interface RolePermissionMatrix {
+  roles: RolePermissions[];
+  all_available_permissions: string[];
+}
+
+export interface AuditLog {
+  id: string;
+  actor_name: string;
+  actor_role: string;
+  action: string;
+  resource_type: string;
+  resource_id?: string | null;
+  details: Record<string, any>;
+  timestamp: string;
+}
+
+
 
 

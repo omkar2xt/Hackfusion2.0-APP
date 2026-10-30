@@ -30,22 +30,22 @@ from app.schemas.hierarchy import (
     UserGroupResponse
 )
 
-DEFAULT_INSTITUTION_ID = "inst-apex-01"
-DEFAULT_CAMPUS_ID = "camp-main-01"
-DEFAULT_DEPT_ID = "dept-cs-01"
+DEFAULT_INSTITUTION_ID = "inst-kls-01"
+DEFAULT_CAMPUS_ID = "camp-vdit-01"
+DEFAULT_DEPT_ID = "dept-cse-01"
 
 
 class AlertAndDeviceService:
     @classmethod
     def seed_hierarchy_if_empty(cls, db: Session) -> None:
-        """Seeds default multi-tier campus hierarchy if empty."""
+        """Seeds verified KLS VDIT multi-tier institutional hierarchy if empty."""
         inst = db.query(InstitutionModel).filter(InstitutionModel.id == DEFAULT_INSTITUTION_ID).first()
         if not inst:
             inst = InstitutionModel(
                 id=DEFAULT_INSTITUTION_ID,
-                name="Apex Institute of Science & Technology",
-                code="AIST",
-                domain="campus.edu",
+                name="Karnatak Law Society (KLS)",
+                code="KLS",
+                domain="klsvdit.edu.in",
                 created_at=datetime.utcnow()
             )
             db.add(inst)
@@ -53,9 +53,9 @@ class AlertAndDeviceService:
             camp = CampusModel(
                 id=DEFAULT_CAMPUS_ID,
                 institution_id=DEFAULT_INSTITUTION_ID,
-                name="Main University Campus",
-                code="MAIN",
-                location="Academic Grounds & Research Park",
+                name="Vishwanathrao Deshpande Institute of Technology (KLS VDIT)",
+                code="VDIT",
+                location="Dandeli Road, Haliyal, Karnataka 581329",
                 created_at=datetime.utcnow()
             )
             db.add(camp)
@@ -63,39 +63,52 @@ class AlertAndDeviceService:
             departments_data = [
                 {
                     "id": DEFAULT_DEPT_ID,
-                    "name": "Computer Science & Cybersecurity",
-                    "code": "CS-CYBER",
-                    "head": "Dr. Aris Thorne",
+                    "name": "Computer Science & Engineering",
+                    "code": "CSE-VDIT",
+                    "head": "Dr. Ravindra Patil",
                     "groups": [
-                        ("grp-cs-01", "Cyber Defense & Threat Responders", "SECURITY_ADMIN", "Lead SOC Incident Responders"),
-                        ("grp-cs-02", "CS Undergraduates & Lab Users", "STUDENT", "General CS Student Body"),
+                        ("grp-cs-01", "Cyber Defense & SOC Analyst Team", "SECURITY_ADMIN", "Lead SOC Incident Responders & Threat Hunters"),
+                        ("grp-cs-02", "CSE Undergraduates & Lab Engineers", "STUDENT", "Computer Science Student Body & Lab Workstations"),
+                        ("grp-cs-03", "Faculty & Senior Researchers", "FACULTY", "Departmental Faculty & Research Guides"),
+                    ]
+                },
+                {
+                    "id": "dept-ece-01",
+                    "name": "Electronics & Communication Engineering",
+                    "code": "ECE-VDIT",
+                    "head": "Dr. Arun L. Kakhandki",
+                    "groups": [
+                        ("grp-ece-01", "IoT, Robotics & Embedded Systems Lab", "STUDENT", "Hardware Security & IoT Device Testing"),
+                        ("grp-ece-02", "ECE Faculty Council", "FACULTY", "Electronics Engineering Teaching Faculty"),
+                    ]
+                },
+                {
+                    "id": "dept-mech-01",
+                    "name": "Mechanical Engineering Complex",
+                    "code": "MECH-VDIT",
+                    "head": "Dr. K. S. Pujar",
+                    "groups": [
+                        ("grp-mech-01", "CAD/CAM & Automation Engineers", "STUDENT", "Mechanical Simulation & Lab Systems"),
                     ]
                 },
                 {
                     "id": "dept-fin-01",
-                    "name": "Financial Services & Bursar",
-                    "code": "FIN-BURSAR",
-                    "head": "Eleanor Vance",
+                    "name": "Administrative & Bursar Office",
+                    "code": "ADMIN-BURSAR",
+                    "head": "Office of the Registrar",
                     "groups": [
-                        ("grp-fin-01", "Bursar Accounts & Wire Authorizers", "STAFF", "Financial disbursement & fees"),
+                        ("grp-fin-01", "Accounts & Fee Treasury Desk", "STAFF", "Financial disbursement & verified fee receipts"),
+                        ("grp-fin-02", "Admissions & Student Records", "STAFF", "Enrollment database & credential issue"),
                     ]
                 },
                 {
-                    "id": "dept-stu-01",
-                    "name": "Office of Student Affairs",
-                    "code": "STUDENT-AFF",
-                    "head": "Marcus Holloway",
+                    "id": "dept-sec-01",
+                    "name": "Campus Security & Facility Operations",
+                    "code": "CAMPUS-OPS",
+                    "head": "Chief Security Officer",
                     "groups": [
-                        ("grp-stu-01", "Student Council & Resident Advisors", "STUDENT", "Peer advisory network"),
-                    ]
-                },
-                {
-                    "id": "dept-its-01",
-                    "name": "Information Technology Services (ITS)",
-                    "code": "ITS-NET",
-                    "head": "Chief Information Security Officer",
-                    "groups": [
-                        ("grp-its-01", "Campus Network & Perimeter Gateway", "STAFF", "Wi-Fi & DNS infrastructure"),
+                        ("grp-sec-01", "Perimeter Security & Incident Patrol", "SECURITY_ADMIN", "Campus Gate Patrol & Emergency Response"),
+                        ("grp-sec-02", "Campus Wi-Fi & IT Gateway Mesh", "STAFF", "Campus-wide Wi-Fi APs & Core Switches"),
                     ]
                 }
             ]

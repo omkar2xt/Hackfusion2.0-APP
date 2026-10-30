@@ -64,6 +64,7 @@ interface UserGpsState {
 
 export const RadarPage: React.FC = () => {
   // 1. Data States
+  const [viewMode, setViewMode] = useState<'mesh' | 'gis'>('mesh');
   const [radar, setRadar] = useState<CyberRadarOverview | null>(null);
   const [buildings, setBuildings] = useState<CampusBuilding[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -223,6 +224,14 @@ export const RadarPage: React.FC = () => {
       mapInstanceRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (viewMode === 'gis') {
+      setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+      }, 150);
+    }
+  }, [viewMode]);
 
   // --- RENDER BUILDING & THREAT MARKERS ON MAP ---
   useEffect(() => {
@@ -952,34 +961,423 @@ export const RadarPage: React.FC = () => {
           </div>
         </div>
 
-        {/* MAIN VISUAL SECTION: INTERACTIVE LEAFLET CAMPUS MAP (PRIMARY) */}
+        {/* MAIN VISUAL SECTION: INTERACTIVE CAMPUS PROXIMITY MESH & GIS MAP */}
         <div className="p-5 sm:p-6 rounded-3xl bg-white border border-[#E5E9ED] shadow-sm relative overflow-hidden space-y-4">
-          {/* Header Bar matching Screenshot */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E5E9ED] gap-2">
+          {/* Header Bar matching Screenshot exactly */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E5E9ED] gap-3">
             <div className="flex items-center gap-2.5">
               <div className="w-3 h-3 rounded-full bg-[#315E63]" />
               <h2 className="text-sm font-bold text-[#202A35] uppercase tracking-wider">
                 Interactive Campus Proximity Mesh Map
               </h2>
             </div>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1.5 text-[11px] text-[#C74747] font-semibold">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#C74747]" /> Red Alert Zone
-              </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-[#C58A35] font-semibold">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#C58A35]" /> Elevated
-              </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-[#27845A] font-semibold">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#27845A]" /> Secure
-              </span>
+
+            <div className="flex flex-wrap items-center gap-4 text-xs">
+              {/* Legend matching Screenshot */}
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5 text-[11px] text-[#C74747] font-semibold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#C74747]" /> Red Alert Zone
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] text-[#C58A35] font-semibold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#C58A35]" /> Elevated
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] text-[#27845A] font-semibold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#27845A]" /> Secure
+                </span>
+              </div>
+
+              {/* View Mode Switcher */}
+              <div className="flex items-center p-0.5 rounded-xl bg-[#F0F4F4] border border-[#E5E9ED]">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('mesh')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    viewMode === 'mesh'
+                      ? 'bg-white text-[#315E63] shadow-xs'
+                      : 'text-[#64748B] hover:text-[#202A35]'
+                  }`}
+                >
+                  Mesh Topology
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('gis')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    viewMode === 'gis'
+                      ? 'bg-white text-[#315E63] shadow-xs'
+                      : 'text-[#64748B] hover:text-[#202A35]'
+                  }`}
+                >
+                  Leaflet GIS
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Leaflet Map Surface */}
-          <div className="relative w-full h-[450px] sm:h-[520px] rounded-2xl overflow-hidden border border-[#E5E9ED] shadow-inner">
+          {/* VIEW MODE 1: 2D VECTOR PROXIMITY MESH (EXACT MATCH WITH SCREENSHOT) */}
+          {viewMode === 'mesh' && (
+            <div className="relative w-full h-[470px] sm:h-[540px] rounded-2xl overflow-hidden border border-[#E5E9ED] bg-[#FAFBFC] select-none shadow-inner">
+              {/* SVG Grid, Concentric Rings & Curved Mesh Arcs */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="proximity-grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E5E9ED" strokeWidth="0.8" opacity="0.65" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#proximity-grid-pattern)" />
+
+                {/* Concentric Proximity Rings around Engineering & CS Quad (32%, 28%) */}
+                <circle cx="32%" cy="28%" r="38" fill="none" stroke="#315E63" strokeWidth="1.2" opacity="0.25" />
+                <circle cx="32%" cy="28%" r="76" fill="none" stroke="#C74747" strokeWidth="1" strokeDasharray="4 4" opacity="0.2" />
+                <circle cx="32%" cy="28%" r="120" fill="none" stroke="#C74747" strokeWidth="0.8" opacity="0.12" />
+
+                {/* Concentric Proximity Rings around Admin Hub (68%, 37%) */}
+                <circle cx="68%" cy="37%" r="35" fill="none" stroke="#C74747" strokeWidth="1.2" opacity="0.25" />
+                <circle cx="68%" cy="37%" r="70" fill="none" stroke="#C74747" strokeWidth="1" strokeDasharray="4 4" opacity="0.2" />
+                <circle cx="68%" cy="37%" r="110" fill="none" stroke="#C74747" strokeWidth="0.8" opacity="0.12" />
+
+                {/* Concentric Proximity Rings around Main Library (48%, 50%) */}
+                <circle cx="48%" cy="50%" r="36" fill="none" stroke="#C58A35" strokeWidth="1.2" opacity="0.3" />
+                <circle cx="48%" cy="50%" r="72" fill="none" stroke="#C58A35" strokeWidth="1" strokeDasharray="4 4" opacity="0.2" />
+
+                {/* Concentric Proximity Rings around Dining Hall (25%, 60%) */}
+                <circle cx="25%" cy="60%" r="34" fill="none" stroke="#C58A35" strokeWidth="1.2" opacity="0.25" />
+                <circle cx="25%" cy="60%" r="68" fill="none" stroke="#C58A35" strokeWidth="0.8" opacity="0.15" />
+
+                {/* Concentric Proximity Rings around Residence Halls (55%, 72%) */}
+                <circle cx="55%" cy="72%" r="35" fill="none" stroke="#27845A" strokeWidth="1.2" opacity="0.3" />
+                <circle cx="55%" cy="72%" r="75" fill="none" stroke="#27845A" strokeWidth="0.8" opacity="0.15" />
+
+                {/* Concentric Proximity Rings around Science Tower (76%, 63%) */}
+                <circle cx="76%" cy="63%" r="35" fill="none" stroke="#27845A" strokeWidth="1.2" opacity="0.3" />
+                <circle cx="76%" cy="63%" r="75" fill="none" stroke="#27845A" strokeWidth="0.8" opacity="0.15" />
+
+                {/* Sweeping Connecting Mesh Arcs between Nodes */}
+                <path d="M 680 120 C 520 200, 480 320, 760 410" fill="none" stroke="#D1D9E0" strokeWidth="1.2" opacity="0.45" />
+                <path d="M 320 180 C 420 220, 460 260, 480 320" fill="none" stroke="#D1D9E0" strokeWidth="1.2" opacity="0.45" />
+                <path d="M 680 240 C 580 260, 520 290, 480 320" fill="none" stroke="#D1D9E0" strokeWidth="1.2" opacity="0.45" />
+                <path d="M 250 390 C 350 420, 450 440, 550 470" fill="none" stroke="#D1D9E0" strokeWidth="1.2" opacity="0.45" />
+                <path d="M 550 470 C 650 480, 700 450, 760 410" fill="none" stroke="#D1D9E0" strokeWidth="1.2" opacity="0.45" />
+              </svg>
+
+              {/* INTERACTIVE MESH NODES (Matching Screenshot) */}
+              {[
+                {
+                  code: 'ENG-QUAD',
+                  name: 'Engineering & CS Quad',
+                  threatLevel: 'RED_ALERT',
+                  threats: 14,
+                  vector: 'Credential Harvester',
+                  activity: '3m ago (Fake SSO Wi-Fi Portal)',
+                  radius: 150,
+                  top: '28%',
+                  left: '32%',
+                  lat: 15.3225,
+                  lng: 74.7552,
+                },
+                {
+                  code: 'ADMIN-BURSAR',
+                  name: 'Administration & Bursar Hub',
+                  threatLevel: 'RED_ALERT',
+                  threats: 19,
+                  vector: 'Impersonation Wire Phish',
+                  activity: '12m ago (Executive Impersonation)',
+                  radius: 120,
+                  top: '37%',
+                  left: '68%',
+                  lat: 15.3228,
+                  lng: 74.7548,
+                },
+                {
+                  code: 'LIB-COMMONS',
+                  name: 'Main Library Commons',
+                  threatLevel: 'ELEVATED',
+                  threats: 8,
+                  vector: 'Malicious QR Code',
+                  activity: '25m ago (Quishing Poster on Notice Board)',
+                  radius: 100,
+                  top: '50%',
+                  left: '48%',
+                  lat: 15.3221,
+                  lng: 74.7549,
+                },
+                {
+                  code: 'STUDENT-UNION',
+                  name: 'Student Life & Dining Hall',
+                  threatLevel: 'ELEVATED',
+                  threats: 6,
+                  vector: 'Phishing SMS',
+                  activity: '45m ago (Fake Meal Discount SMS)',
+                  radius: 90,
+                  top: '60%',
+                  left: '25%',
+                  lat: 15.3224,
+                  lng: 74.7542,
+                },
+                {
+                  code: 'RESIDENCE-HALLS',
+                  name: 'Residence Halls & Dorms',
+                  threatLevel: 'SECURE',
+                  threats: 3,
+                  vector: 'Smishing Link',
+                  activity: '2h ago (Cleared by Security Patrol)',
+                  radius: 200,
+                  top: '72%',
+                  left: '55%',
+                  lat: 15.3212,
+                  lng: 74.7538,
+                },
+                {
+                  code: 'SCIENCE-TOWER',
+                  name: 'Science & Bio-Research Tower',
+                  threatLevel: 'SECURE',
+                  threats: 2,
+                  vector: 'Reconnaissance Scan',
+                  activity: '3h ago (Port Scan Blocked by Firewall)',
+                  radius: 110,
+                  top: '63%',
+                  left: '76%',
+                  lat: 15.3232,
+                  lng: 74.7555,
+                },
+              ].map((node) => {
+                const isSelected = selectedZone?.code === node.code;
+                const distanceToUser = Math.round(
+                  turf.distance(
+                    turf.point([activePosition.lng, activePosition.lat]),
+                    turf.point([node.lng, node.lat]),
+                    { units: 'meters' }
+                  )
+                );
+                // User is here if closest building or within 120m
+                const isUserHere =
+                  nearestBuilding?.code === node.code ||
+                  (sim.enabled && sim.activeBuildingName?.includes(node.name.split(' ')[0]));
+
+                return (
+                  <div
+                    key={node.code}
+                    title={`${node.name} • ${distanceToUser}m away`}
+                    onClick={() => {
+                      setSelectedZone({
+                        id: `bldg-${node.code.toLowerCase()}`,
+                        name: node.name,
+                        code: node.code,
+                        category: 'academic',
+                        threat_level: node.threatLevel === 'SECURE' ? 'NORMAL' : (node.threatLevel as 'RED_ALERT' | 'ELEVATED'),
+                        active_threats: node.threats,
+                        reported_incidents_today: 4,
+                        radius_meters: node.radius,
+                        proximity_alert_active: node.threatLevel === 'RED_ALERT',
+                        last_reported_attack: node.activity,
+                        top_threat_vector: node.vector,
+                        x_percent: 50,
+                        y_percent: 50,
+                      });
+                    }}
+                    style={{ top: node.top, left: node.left }}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center cursor-pointer transition-all duration-200 z-10 hover:scale-105 ${
+                      isSelected ? 'scale-105 z-20' : ''
+                    }`}
+                  >
+                    {/* Circular Badge */}
+                    <div className="relative mb-1">
+                      {isUserHere && (
+                        <div className="absolute -inset-2 rounded-full border-2 border-[#315E63] animate-ping opacity-60" />
+                      )}
+                      <div
+                        className={`w-11 h-11 rounded-full flex items-center justify-center text-white border-2 border-white shadow-md transition-shadow ${
+                          node.threatLevel === 'RED_ALERT'
+                            ? 'bg-[#C74747] shadow-[#C74747]/30'
+                            : node.threatLevel === 'ELEVATED'
+                            ? 'bg-[#D49A58] shadow-[#D49A58]/30'
+                            : 'bg-[#27845A] shadow-[#27845A]/30'
+                        } ${isUserHere ? 'ring-3 ring-[#315E63] ring-offset-2' : ''}`}
+                      >
+                        {node.threatLevel === 'RED_ALERT' ? (
+                          <AlertTriangle size={18} strokeWidth={2.5} />
+                        ) : node.threatLevel === 'ELEVATED' ? (
+                          <Radio size={18} strokeWidth={2.5} />
+                        ) : (
+                          <Shield size={18} strokeWidth={2.5} />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Floating White Pill Card matching screenshot */}
+                    <div
+                      className={`bg-white border px-3 py-1.5 rounded-2xl shadow-md flex flex-col items-center whitespace-nowrap transition ${
+                        isSelected
+                          ? 'border-[#315E63] ring-2 ring-[#315E63]/20'
+                          : 'border-[#E5E9ED] hover:border-[#315E63]/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-[#202A35]">{node.name}</span>
+                        {isUserHere && (
+                          <span className="bg-[#202A35] text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-xs">
+                            YOU
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-[#64748B] flex items-center gap-1 font-medium mt-0.5">
+                        <span>{node.threats} threats</span>
+                        <span>•</span>
+                        <span>{node.vector}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Movement Simulator Floating D-Pad Overlay (when sim enabled) */}
+              {sim.enabled && (
+                <div className="absolute top-3 left-3 z-30 bg-white/95 backdrop-blur-sm border border-[#397C78] p-3 rounded-2xl shadow-lg flex flex-col gap-2 max-w-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-white bg-[#397C78] px-2 py-0.5 rounded">
+                      TEST MODE — Movement Simulator
+                    </span>
+                    <button
+                      onClick={resetSimulator}
+                      className="p-1 text-[#64748B] hover:text-[#202A35] cursor-pointer"
+                      title="Reset position"
+                    >
+                      <RotateCcw size={12} />
+                    </button>
+                  </div>
+                  <div className="text-[11px] font-semibold text-[#202A35]">
+                    Building: <strong className="text-[#315E63]">{sim.activeBuildingName}</strong>
+                  </div>
+                  <div className="text-[10px] text-[#64748B] font-mono">
+                    Traveled: {sim.totalDistanceTraveled} m | Speed: {sim.speedMode === 'walk' ? '1.5 m/s' : '4.0 m/s'}
+                  </div>
+
+                  {/* Speed Toggle */}
+                  <div className="flex items-center gap-1 pt-0.5">
+                    <button
+                      onClick={() => setSim((p) => ({ ...p, speedMode: 'walk', stepMeters: 12 }))}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
+                        sim.speedMode === 'walk' ? 'bg-[#315E63] text-white' : 'bg-[#F0F4F4] text-[#64748B]'
+                      }`}
+                    >
+                      Walk (1.5 m/s)
+                    </button>
+                    <button
+                      onClick={() => setSim((p) => ({ ...p, speedMode: 'sprint', stepMeters: 28 }))}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
+                        sim.speedMode === 'sprint' ? 'bg-[#315E63] text-white' : 'bg-[#F0F4F4] text-[#64748B]'
+                      }`}
+                    >
+                      Sprint (4.0 m/s)
+                    </button>
+                  </div>
+
+                  {/* Virtual D-Pad Controls */}
+                  <div className="pt-1 flex flex-col items-center">
+                    <button
+                      onClick={() => handleSimMove('N')}
+                      className="p-1.5 rounded-lg bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] font-bold cursor-pointer shadow-xs mb-1"
+                      title="Move North"
+                    >
+                      <ArrowUp size={16} />
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleSimMove('W')}
+                        className="p-1.5 rounded-lg bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] font-bold cursor-pointer shadow-xs"
+                        title="Move West"
+                      >
+                        <ArrowLeft size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleSimMove('S')}
+                        className="p-1.5 rounded-lg bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] font-bold cursor-pointer shadow-xs"
+                        title="Move South"
+                      >
+                        <ArrowDown size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleSimMove('E')}
+                        className="p-1.5 rounded-lg bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] font-bold cursor-pointer shadow-xs"
+                        title="Move East"
+                      >
+                        <ArrowRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick Teleport to Buildings */}
+                  <div className="pt-1 border-t border-[#E5E9ED] text-[10px] text-[#64748B]">
+                    <span>Jump Location:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <button
+                        onClick={() => {
+                          setSim((p) => ({
+                            ...p,
+                            lat: 15.3225,
+                            lng: 74.7552,
+                            activeBuildingName: 'Engineering & CS Quad',
+                          }));
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] cursor-pointer"
+                      >
+                        Eng Quad
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSim((p) => ({
+                            ...p,
+                            lat: 15.3228,
+                            lng: 74.7548,
+                            activeBuildingName: 'Administration & Bursar Hub',
+                          }));
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] cursor-pointer"
+                      >
+                        Admin
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSim((p) => ({
+                            ...p,
+                            lat: 15.3221,
+                            lng: 74.7549,
+                            activeBuildingName: 'Main Library Commons',
+                          }));
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] cursor-pointer"
+                      >
+                        Library
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSim((p) => ({
+                            ...p,
+                            lat: 15.3232,
+                            lng: 74.7555,
+                            activeBuildingName: 'Science & Bio-Research Tower',
+                          }));
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] cursor-pointer"
+                      >
+                        Science
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* VIEW MODE 2: GEOGRAPHIC LEAFLET OSM MAP */}
+          <div
+            className={`relative w-full h-[450px] sm:h-[520px] rounded-2xl overflow-hidden border border-[#E5E9ED] shadow-inner ${
+              viewMode === 'gis' ? 'block' : 'hidden'
+            }`}
+          >
             <div ref={mapElementRef} className="w-full h-full z-10" />
 
-            {/* Simulated Test Mode Watermark / Controls Overlay */}
+            {/* Simulated Test Mode Watermark / Controls Overlay in GIS view */}
             {sim.enabled && (
               <div className="absolute top-3 left-3 z-20 bg-white/95 backdrop-blur-sm border border-[#397C78] p-3 rounded-2xl shadow-lg flex flex-col gap-2 max-w-xs">
                 <div className="flex items-center justify-between">
@@ -999,30 +1397,6 @@ export const RadarPage: React.FC = () => {
                 </div>
                 <div className="text-[10px] text-[#64748B] font-mono">
                   Traveled: {sim.totalDistanceTraveled} m | Lat: {sim.lat.toFixed(5)}
-                </div>
-
-                {/* Speed Toggle */}
-                <div className="flex items-center gap-1 pt-1">
-                  <button
-                    onClick={() => setSim((p) => ({ ...p, speedMode: 'walk', stepMeters: 10 }))}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
-                      sim.speedMode === 'walk'
-                        ? 'bg-[#315E63] text-white'
-                        : 'bg-[#F0F4F4] text-[#64748B]'
-                    }`}
-                  >
-                    Walk (1.5 m/s)
-                  </button>
-                  <button
-                    onClick={() => setSim((p) => ({ ...p, speedMode: 'sprint', stepMeters: 25 }))}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
-                      sim.speedMode === 'sprint'
-                        ? 'bg-[#315E63] text-white'
-                        : 'bg-[#F0F4F4] text-[#64748B]'
-                    }`}
-                  >
-                    Sprint (4.0 m/s)
-                  </button>
                 </div>
 
                 {/* Virtual D-Pad Controls */}
