@@ -47,13 +47,39 @@ class ApiService {
   private baseUrl: string;
 
   constructor() {
+    const customEndpoint =
+      typeof window !== 'undefined' ? localStorage.getItem('yodhra_custom_api_url') : null;
     const envBase = import.meta.env.VITE_API_BASE_URL;
-    if (envBase !== undefined && envBase !== '') {
+
+    if (customEndpoint && customEndpoint.trim() !== '') {
+      this.baseUrl = customEndpoint.replace(/\/+$/, '');
+    } else if (envBase !== undefined && envBase !== '') {
       this.baseUrl = envBase.replace(/\/+$/, '');
+    } else if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.()) {
+      // Native Android APK: default to cloud production endpoint (overridable in app settings)
+      this.baseUrl = 'https://api.yodhra.klsvdit.edu.in';
     } else {
-      // In development with Vite dev proxy, empty string routes requests same-origin to Vite proxy
-      this.baseUrl = import.meta.env.DEV ? '' : 'http://127.0.0.1:8000';
+      // Web PWA: In dev mode Vite proxy routes ''; in prod uses same origin
+      this.baseUrl = import.meta.env.DEV ? '' : (typeof window !== 'undefined' ? window.location.origin : '');
     }
+  }
+
+  public getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  public setBaseUrl(url: string): void {
+    this.baseUrl = url.replace(/\/+$/, '');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('yodhra_custom_api_url', this.baseUrl);
+    }
+  }
+
+  // --- App Distribution & Version Updates ---
+  async getAppVersion(): Promise<any> {
+    return this.request<any>('/api/v1/app/version', {
+      method: 'GET',
+    });
   }
 
   private getToken(): string | null {

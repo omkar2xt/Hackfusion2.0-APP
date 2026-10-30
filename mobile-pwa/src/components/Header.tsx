@@ -15,6 +15,7 @@ import {
   X,
   AlertTriangle,
   ChevronRight,
+  Smartphone,
 } from 'lucide-react';
 import Logo from './Logo';
 
@@ -39,6 +40,7 @@ export default function Header({ title, subtitle, showBack = false }: HeaderProp
     { label: 'Cyber Readiness', path: '/coach', icon: ShieldCheck, desc: 'SOC investigation workspace' },
     { label: 'Reports', path: '/reports', icon: FileText, desc: 'Incident cases & offline sync' },
     { label: 'Profile & Relay', path: '/profile', icon: UserIcon, desc: 'Device mesh & account hierarchy' },
+    { label: 'Get APK', path: '/download', icon: Smartphone, desc: 'Direct Android APK & sideloading' },
   ];
 
   return (
@@ -95,6 +97,16 @@ export default function Header({ title, subtitle, showBack = false }: HeaderProp
 
           {/* Right Action Icons: Red Alert Radar Shortcut + Mobile Hamburger */}
           <div className="flex items-center gap-2">
+            {/* APK Download Button */}
+            <button
+              onClick={() => navigate('/download')}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#315E63]/10 hover:bg-[#315E63]/20 border border-[#315E63]/25 text-[#315E63] text-xs font-bold transition active:scale-95 cursor-pointer"
+              title="Download Android APK"
+            >
+              <Smartphone size={13} className="text-[#315E63]" />
+              <span>Get APK</span>
+            </button>
+
             <button
               onClick={() => navigate('/radar')}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#C74747]/10 hover:bg-[#C74747]/20 border border-[#C74747]/25 text-[#C74747] text-xs font-bold transition active:scale-95 cursor-pointer"

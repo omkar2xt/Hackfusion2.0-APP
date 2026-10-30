@@ -16,8 +16,10 @@ class Settings(BaseSettings):
         "http://10.10.9.33:5173,http://192.168.56.1:5173"
     )
 
-    # Database configuration
-    DATABASE_URL: str = "sqlite:///./signalsafe.db"
+    # Database configuration - resolve absolute path to backend/signalsafe.db
+    _backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    _default_db_path = os.path.join(_backend_dir, "signalsafe.db").replace("\\", "/")
+    DATABASE_URL: str = f"sqlite:///{_default_db_path}"
 
     # Supabase optional integration
     SUPABASE_URL: str = ""

@@ -22,6 +22,7 @@ import { ThreatDnaPage } from './pages/ThreatDnaPage';
 import { TrustGraphPage } from './pages/TrustGraphPage';
 import { CoachPage } from './pages/CoachPage';
 import { InvestigationPage } from './pages/InvestigationPage';
+import DownloadPage from './pages/DownloadPage';
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
               <Route path="/trust-graph" element={<TrustGraphPage />} />
               <Route path="/coach" element={<CoachPage />} />
               <Route path="/investigation" element={<InvestigationPage />} />
+              <Route path="/download" element={<DownloadPage />} />
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

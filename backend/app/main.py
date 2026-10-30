@@ -22,6 +22,9 @@ from app.api.routes.emergency_alerts import router as emergency_alerts_router
 from app.api.routes.campus import router as campus_router
 from app.api.routes.investigation import router as investigation_router
 from app.api.routes.iam import router as iam_router
+from app.api.routes.app_distribution import router as app_distribution_router
+from fastapi.staticfiles import StaticFiles
+import os
 
 
 @asynccontextmanager
@@ -80,6 +83,12 @@ app.include_router(emergency_alerts_router, prefix="/api/v1")
 app.include_router(campus_router, prefix="/api/v1")
 app.include_router(investigation_router, prefix="/api/v1")
 app.include_router(iam_router, prefix="/api/v1")
+app.include_router(app_distribution_router, prefix="/api/v1")
+
+# Mount direct APK downloads directory
+downloads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "downloads")
+os.makedirs(downloads_dir, exist_ok=True)
+app.mount("/downloads", StaticFiles(directory=downloads_dir), name="downloads")
 
 
 @app.get("/")
