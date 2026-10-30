@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { validateEmail } from '../utils/helpers';
+import Logo from '../components/Logo';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -54,10 +55,14 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-[#0a0f1e] via-[#0d1326] to-[#111827] px-6 py-12">
       {/* Branding */}
       <div className="mb-10 flex flex-col items-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/25">
-          <Shield className="h-7 w-7 text-white" strokeWidth={2} />
-        </div>
-        <h1 className="text-2xl font-bold text-white">SignalSafe Campus</h1>
+        <Logo size="xl" variant="full" showText={false} className="mb-3" />
+        <h1 className="text-3xl font-black text-white tracking-wider uppercase">YODHRA</h1>
+        <p className="text-xs font-semibold text-cyan-400 tracking-widest uppercase mt-0.5">
+          CYBER INTELLIGENCE • CAMPUS
+        </p>
+        <p className="text-[11px] text-slate-400 font-mono tracking-wider mt-1">
+          DEFEND • DETECT • RESPOND
+        </p>
       </div>
 
       {/* Form */}

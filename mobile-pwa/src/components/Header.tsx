@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
-  Shield,
   LayoutDashboard,
   Search,
   QrCode,
@@ -17,6 +16,7 @@ import {
   AlertTriangle,
   ChevronRight
 } from 'lucide-react';
+import Logo from './Logo';
 
 interface HeaderProps {
   title?: string;
@@ -57,23 +57,11 @@ export default function Header({ title, subtitle, showBack = false }: HeaderProp
               </button>
             )}
 
-            <div
+            <Logo
+              size="md"
               onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2.5 cursor-pointer group shrink-0"
-            >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-md shadow-teal-500/20 group-hover:brightness-110 transition">
-                <Shield size={19} className="text-slate-950 font-bold" strokeWidth={2.5} />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold text-white tracking-tight">SignalSafe</span>
-                  <span className="text-[10px] font-bold text-teal-400 bg-teal-500/10 border border-teal-500/30 px-1.5 py-0.2 rounded uppercase">
-                    Campus
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-400 hidden sm:block">Unified Cybersecurity Defense</p>
-              </div>
-            </div>
+              className="shrink-0"
+            />
 
             {title && (
               <div className="ml-2 pl-3 border-l border-slate-800 hidden xl:block max-w-xs truncate">
@@ -134,18 +122,10 @@ export default function Header({ title, subtitle, showBack = false }: HeaderProp
           <div className="w-full max-w-sm bg-[#080d18] border-l border-slate-800 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
             {/* Drawer Top Header */}
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center text-slate-950 font-bold text-xs">
-                  SS
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">SignalSafe Campus</h3>
-                  <span className="text-[10px] text-teal-400 font-mono">SOC Portal v2.0</span>
-                </div>
-              </div>
+              <Logo size="sm" variant="full" />
               <button
                 onClick={() => setMobileDrawerOpen(false)}
-                className="w-8 h-8 rounded-lg bg-slate-900 text-slate-400 hover:text-white flex items-center justify-center"
+                className="w-8 h-8 rounded-lg bg-slate-900 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
               >
                 <X size={17} />
               </button>

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Shield, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
+import Logo from '../components/Logo';
 
 export default function WelcomePage() {
   const navigate = useNavigate();
@@ -49,24 +50,23 @@ export default function WelcomePage() {
 
       {/* Main content */}
       <div className="relative z-10 flex flex-col items-center px-6 text-center">
-        {/* Shield icon with glow */}
-        <div className="relative mb-8">
+        {/* Emblem icon with glow */}
+        <div className="relative mb-6">
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-24 w-24 rounded-full bg-teal-500/20 blur-xl animate-pulse" />
+            <div className="h-32 w-32 rounded-full bg-cyan-500/25 blur-2xl animate-pulse" />
           </div>
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/30">
-            <Shield className="h-10 w-10 text-white" strokeWidth={2} />
-          </div>
+          <Logo size="xl" showText={false} />
         </div>
 
-        {/* Title */}
-        <h1 className="mb-3 text-4xl font-bold tracking-tight text-white sm:text-5xl">
-          SignalSafe Campus
+        {/* Title & Tagline */}
+        <h1 className="text-4xl sm:text-5xl font-black tracking-wider text-white uppercase font-sans">
+          YODHRA
         </h1>
-
-        {/* Tagline */}
-        <p className="mb-12 text-lg text-slate-400">
-          Think Before You Click.
+        <p className="mt-1 text-sm font-bold tracking-widest text-cyan-400 uppercase">
+          CYBER INTELLIGENCE • CAMPUS
+        </p>
+        <p className="mt-2 mb-10 text-xs sm:text-sm font-mono tracking-widest text-slate-400">
+          DEFEND • DETECT • RESPOND
         </p>
 
         {/* Sign In button */}
