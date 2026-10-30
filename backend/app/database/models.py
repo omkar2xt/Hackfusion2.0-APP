@@ -316,3 +316,100 @@ class AlertDeliveryModel(Base):
     acknowledged_at = Column(DateTime, nullable=True)
     device_ack_hash = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =========================================================================
+# CAMPUS GEOSPATIAL INTELLIGENCE RADAR & GEOFENCING
+# =========================================================================
+
+class CampusBuildingModel(Base):
+    __tablename__ = "campus_buildings"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(200), nullable=False)
+    code = Column(String(50), nullable=False)
+    building_type = Column(String(100), default="academic")  # academic, administration, library, residential, amenities, security, emergency
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    radius_meters = Column(Integer, default=120)
+    description = Column(Text, default="")
+    contact_lead = Column(String(150), default="")
+    is_verified = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CampusZoneModel(Base):
+    __tablename__ = "campus_zones"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(200), nullable=False)
+    zone_type = Column(String(100), default="standard")  # standard, restricted, security_sensitive, high_traffic
+    building_id = Column(String(36), nullable=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    boundary_geometry = Column(JSON, default=dict)
+    threat_level = Column(String(30), default="NORMAL")  # RED_ALERT, ELEVATED, NORMAL
+    notification_radius = Column(Integer, default=150)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class IncidentLocationModel(Base):
+    __tablename__ = "incident_locations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    incident_id = Column(String(36), nullable=False)
+    building_id = Column(String(36), nullable=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    location_accuracy = Column(Float, default=10.0)
+    location_source = Column(String(50), default="user_gps")  # user_gps, ip_lookup, building_assigned, manual_admin
+    verified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LocationAlertModel(Base):
+    __tablename__ = "location_alerts"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), nullable=False)
+    incident_id = Column(String(36), nullable=True)
+    zone_id = Column(String(36), nullable=True)
+    building_id = Column(String(36), nullable=True)
+    alert_type = Column(String(50), default="GEOFENCE_PROXIMITY")  # GEOFENCE_PROXIMITY, THREAT_PERIMETER_ENTRY, SOS_CHECKPOINT
+    status = Column(String(30), default="DELIVERED")  # DELIVERED, ACKNOWLEDGED, DISMISSED
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =========================================================================
+# ADVANCED CYBER INVESTIGATION & EVIDENCE VAULT
+# =========================================================================
+
+class EvidenceVaultModel(Base):
+    __tablename__ = "evidence_vault"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    incident_id = Column(String(36), nullable=True)
+    evidence_type = Column(String(50), nullable=False)  # qr_image, decoded_payload, submitted_url, server_log, screenshot
+    file_hash_sha256 = Column(String(64), nullable=False)
+    raw_payload_text = Column(Text, nullable=False)
+    source_origin = Column(String(100), default="campus_triage")
+    uploaded_by = Column(String(100), default="Forensics Analyst")
+    chain_of_custody_json = Column(JSON, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class IncidentCorrelationModel(Base):
+    __tablename__ = "incident_correlations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    incident_id = Column(String(36), nullable=False)
+    related_incident_id = Column(String(36), nullable=False)
+    correlation_factor = Column(String(50), nullable=False)  # SAME_DOMAIN, SAME_IP, SAME_CERT_FINGERPRINT, SAME_REDIRECT_CHAIN, SIMILAR_CAMPAIGN
+    match_strength = Column(String(30), default="CONFIRMED_MATCH")  # CONFIRMED_MATCH, WEAK_SIMILARITY
+    shared_indicator = Column(String(255), nullable=False)
+    reason = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+

@@ -19,6 +19,8 @@ from app.api.routes.coach import router as coach_router
 from app.api.routes.immune_system import router as immune_system_router
 from app.api.routes.devices import router as devices_router
 from app.api.routes.emergency_alerts import router as emergency_alerts_router
+from app.api.routes.campus import router as campus_router
+from app.api.routes.investigation import router as investigation_router
 
 
 @asynccontextmanager
@@ -74,6 +76,8 @@ app.include_router(coach_router, prefix="/api/v1")
 app.include_router(immune_system_router, prefix="/api/v1")
 app.include_router(devices_router, prefix="/api/v1")
 app.include_router(emergency_alerts_router, prefix="/api/v1")
+app.include_router(campus_router, prefix="/api/v1")
+app.include_router(investigation_router, prefix="/api/v1")
 
 
 @app.get("/")

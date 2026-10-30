@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert,
   AlertTriangle,
@@ -9,6 +10,7 @@ import {
   Copy,
   Flag,
   Clock,
+  FileSearch,
 } from 'lucide-react';
 import type { ScanResult } from '../types';
 import { getRiskColor, getRiskBgColor, getScorePercentage, formatDate } from '../utils/helpers';
@@ -129,6 +131,7 @@ function CircularScore({ score, verdict }: { score: number; verdict: string }) {
 }
 
 export default function ScanResultCard({ result, loading, onReport }: ScanResultCardProps) {
+  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
 
   if (loading) {
@@ -233,11 +236,20 @@ export default function ScanResultCard({ result, loading, onReport }: ScanResult
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-2.5">
+        <button
+          onClick={() => navigate('/investigation')}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+            bg-[#315E63] text-white text-xs font-bold
+            hover:bg-[#274c50] active:scale-[0.98] transition cursor-pointer shadow-sm"
+        >
+          <FileSearch size={15} />
+          <span>Deep Forensic Investigation</span>
+        </button>
         <button
           onClick={handleCopy}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
-            bg-white border border-[#E5E9ED] text-sm font-semibold text-[#202A35]
+            bg-white border border-[#E5E9ED] text-xs font-semibold text-[#202A35]
             hover:bg-[#F0F4F4] active:scale-[0.98] transition cursor-pointer shadow-xs"
         >
           <Copy size={15} />
@@ -246,7 +258,7 @@ export default function ScanResultCard({ result, loading, onReport }: ScanResult
         <button
           onClick={() => onReport && onReport(result)}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
-            bg-[#C74747]/10 border border-[#C74747]/25 text-sm font-semibold text-[#C74747]
+            bg-[#C74747]/10 border border-[#C74747]/25 text-xs font-semibold text-[#C74747]
             hover:bg-[#C74747]/20 active:scale-[0.98] transition cursor-pointer"
         >
           <Flag size={15} />

@@ -21,6 +21,7 @@ import { RadarPage } from './pages/RadarPage';
 import { ThreatDnaPage } from './pages/ThreatDnaPage';
 import { TrustGraphPage } from './pages/TrustGraphPage';
 import { CoachPage } from './pages/CoachPage';
+import { InvestigationPage } from './pages/InvestigationPage';
 
 export default function App() {
   return (
@@ -54,6 +55,7 @@ export default function App() {
               <Route path="/campaigns" element={<ThreatDnaPage />} />
               <Route path="/trust-graph" element={<TrustGraphPage />} />
               <Route path="/coach" element={<CoachPage />} />
+              <Route path="/investigation" element={<InvestigationPage />} />
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

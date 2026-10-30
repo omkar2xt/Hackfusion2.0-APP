@@ -15,6 +15,7 @@ import {
   Dna,
   GitFork,
   Award,
+  FileSearch,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import Header from '../components/Header';
@@ -225,7 +226,19 @@ export default function DashboardPage() {
               Campus Intelligence Hub
             </h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+            <div
+              onClick={() => navigate('/investigation')}
+              className="p-4 rounded-2xl bg-white border border-[#315E63]/30 hover:border-[#315E63] hover:bg-[#F0F4F4] cursor-pointer transition space-y-1.5 shadow-xs col-span-2 sm:col-span-1"
+            >
+              <div className="flex items-center justify-between">
+                <FileSearch className="w-5 h-5 text-[#315E63]" />
+                <span className="text-[10px] uppercase font-bold text-white bg-[#315E63] px-1.5 py-0.5 rounded">Core</span>
+              </div>
+              <h3 className="font-bold text-xs sm:text-sm text-[#202A35]">Investigation</h3>
+              <p className="text-[11px] text-[#64748B]">URL & QR Pipelines, Vault</p>
+            </div>
+
             <div
               onClick={() => navigate('/radar')}
               className="p-4 rounded-2xl bg-white border border-[#E5E9ED] hover:border-[#315E63]/40 hover:bg-[#F0F4F4] cursor-pointer transition space-y-1.5 shadow-xs"

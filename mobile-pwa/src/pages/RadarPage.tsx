@@ -1,20 +1,16 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import {
   Shield,
   AlertTriangle,
-  TrendingUp,
-  BarChart2,
   Radio,
   CheckCircle,
   RefreshCw,
   MapPin,
   Bell,
   Zap,
-  Clock,
   Activity,
   X,
   Navigation,
-  Crosshair,
   Footprints,
   Compass,
   ArrowUp,
@@ -22,220 +18,601 @@ import {
   ArrowLeft,
   ArrowRight,
   LocateFixed,
+  Square,
+  RotateCcw,
+  Plus,
+  Settings,
+  Info,
 } from 'lucide-react';
+import L from 'leaflet';
+import * as turf from '@turf/turf';
 import Header from '../components/Header';
 import { api } from '../services/api';
-import type { CyberRadarOverview, CampusZoneTelemetry } from '../types';
+import type {
+  CyberRadarOverview,
+  CampusZoneTelemetry,
+  CampusBuilding,
+  Incident,
+} from '../types';
 
-interface UserCoordinates {
-  x: number; // percentage on map (0-100)
-  y: number; // percentage on map (0-100)
+// Verified KLS VDIT, Haliyal, Karnataka coordinates
+const KLS_VDIT_CENTER = {
+  lat: 15.3227274,
+  lng: 74.7549305,
+};
+
+interface SimulatorState {
+  enabled: boolean;
+  lat: number;
+  lng: number;
+  speedMode: 'walk' | 'sprint'; // 1.5 m/s vs 4.0 m/s
+  stepMeters: number;
+  totalDistanceTraveled: number;
+  activeBuildingName: string | null;
 }
 
-interface GpsTelemetry {
+interface UserGpsState {
   active: boolean;
-  latitude: number | null;
-  longitude: number | null;
+  lat: number | null;
+  lng: number | null;
   accuracy: number | null;
   speed: number | null;
   heading: number | null;
   lastUpdated: string | null;
-  source: 'gps' | 'simulation' | 'manual';
-}
-
-interface ZoneWithDistance extends CampusZoneTelemetry {
-  distanceMeters: number;
-  isWithinRadius: boolean;
-  isApproaching: boolean;
+  status: 'INITIALIZING' | 'ACTIVE' | 'DENIED' | 'UNAVAILABLE' | 'STOPPED';
 }
 
 export const RadarPage: React.FC = () => {
+  // 1. Data States
   const [radar, setRadar] = useState<CyberRadarOverview | null>(null);
+  const [buildings, setBuildings] = useState<CampusBuilding[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // User Movement & Position States
-  const [userPos, setUserPos] = useState<UserCoordinates>({ x: 34, y: 32 }); // Starts near Eng Quad
-  const [targetDestination, setTargetDestination] = useState<string | null>(null);
-  const [movementSpeed, setMovementSpeed] = useState<'walk' | 'run'>('walk');
-  const [isSimulatingWalk, setIsSimulatingWalk] = useState(false);
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  // 2. Active Zone & Selection
+  const [selectedZone, setSelectedZone] = useState<CampusZoneTelemetry | null>(null);
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
 
-  // Live GPS Telemetry
-  const [gps, setGps] = useState<GpsTelemetry>({
+  // 3. Live Hardware GPS State
+  const [gps, setGps] = useState<UserGpsState>({
     active: false,
-    latitude: null,
-    longitude: null,
+    lat: null,
+    lng: null,
     accuracy: null,
     speed: null,
     heading: null,
     lastUpdated: null,
-    source: 'simulation',
+    status: 'STOPPED',
+  });
+  const watchIdRef = useRef<number | null>(null);
+
+  // 4. Movement Simulator (TEST MODE)
+  const [sim, setSim] = useState<SimulatorState>({
+    enabled: false,
+    lat: 15.3225, // Starts at Eng Quad
+    lng: 74.7552,
+    speedMode: 'walk',
+    stepMeters: 15,
+    totalDistanceTraveled: 0,
+    activeBuildingName: 'Engineering & CS Quad (CSE & IT Labs)',
   });
 
-  // Proximity Alert State
-  const [selectedZone, setSelectedZone] = useState<CampusZoneTelemetry | null>(null);
+  // 5. Admin Mapping Panel State
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [newBldgForm, setNewBldgForm] = useState({
+    name: '',
+    code: '',
+    building_type: 'academic',
+    latitude: 15.3227,
+    longitude: 74.7549,
+    radius_meters: 120,
+    description: '',
+  });
+
+  // 6. Proximity Broadcast State
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
   const [broadcastCategory, setBroadcastCategory] = useState('Phishing Outbreak');
-  const [broadcastMessage, setBroadcastMessage] = useState('Urgent: Rogue Wi-Fi portal detected spoofing campus authentication.');
+  const [broadcastMessage, setBroadcastMessage] = useState(
+    'Urgent: Malicious captive Wi-Fi portal detected spoofing campus authentication.'
+  );
   const [broadcasting, setBroadcasting] = useState(false);
   const [broadcastSuccess, setBroadcastSuccess] = useState<string | null>(null);
 
-  // Fetch initial radar telemetry from backend
-  const fetchData = async () => {
+  // 7. Leaflet Map References
+  const mapElementRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
+  const userCircleRef = useRef<L.Circle | null>(null);
+  const simMarkerRef = useRef<L.Marker | null>(null);
+  const buildingLayersRef = useRef<{ [key: string]: L.LayerGroup }>({});
+
+  // Audio Beep for Proximity Alert
+  const playAlertChime = useCallback(() => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+      osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.35);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.35);
+    } catch {
+      // Audio context might be restricted before interaction
+    }
+  }, []);
+
+  // Fetch initial telemetry and buildings
+  const fetchTelemetry = async () => {
     setLoading(true);
     try {
-      const radarData = await api.getCyberRadarOverview();
-      setRadar(radarData);
+      const [radarData, bldgsData, incsData] = await Promise.allSettled([
+        api.getCyberRadarOverview(),
+        api.getCampusBuildings(),
+        api.getIncidents(),
+      ]);
 
-      if (radarData.campus_zones && radarData.campus_zones.length > 0 && !selectedZone) {
-        setSelectedZone(radarData.campus_zones[0]);
+      if (radarData.status === 'fulfilled') {
+        setRadar(radarData.value);
+        if (radarData.value.campus_zones?.length && !selectedZone) {
+          setSelectedZone(radarData.value.campus_zones[0]);
+        }
       }
-    } catch (err: any) {
-      console.error('Failed to load Cyber Radar intelligence:', err);
+
+      if (bldgsData.status === 'fulfilled') {
+        setBuildings(bldgsData.value);
+      }
+
+      if (incsData.status === 'fulfilled') {
+        setIncidents(incsData.value);
+      }
+    } catch (err) {
+      console.error('Error fetching campus radar feeds:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchTelemetry();
   }, []);
 
-  // 1. Live GPS WatchPosition Listener
+  // --- LEAFLET MAP INITIALIZATION ---
   useEffect(() => {
-    let watchId: number | null = null;
+    if (!mapElementRef.current || mapInstanceRef.current) return;
 
-    if ('geolocation' in navigator) {
-      watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude, accuracy, speed, heading } = position.coords;
-          setGps({
-            active: true,
-            latitude,
-            longitude,
-            accuracy: accuracy ? Math.round(accuracy) : 5,
-            speed: speed ? Math.round(speed * 3.6) : 0, // km/h
-            heading: heading !== null && !isNaN(heading) ? Math.round(heading) : 0,
-            lastUpdated: new Date().toLocaleTimeString(),
-            source: 'gps',
-          });
-        },
-        (error) => {
-          console.warn('Geolocation watch notice:', error.message);
-          // Set sensible fallback campus GPS coordinate (e.g. Apex Institute Campus)
-          setGps((prev) => ({
-            ...prev,
-            active: false,
-            latitude: prev.latitude ?? 37.4275,
-            longitude: prev.longitude ?? -122.1697,
-            accuracy: 12,
-            lastUpdated: new Date().toLocaleTimeString(),
-            source: 'simulation',
-          }));
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 3000,
-          timeout: 10000,
-        }
-      );
-    }
+    // Create Leaflet Map centered at KLS VDIT
+    const map = L.map(mapElementRef.current, {
+      center: [KLS_VDIT_CENTER.lat, KLS_VDIT_CENTER.lng],
+      zoom: 17,
+      maxZoom: 19,
+      minZoom: 14,
+      zoomControl: true,
+      attributionControl: false,
+    });
+
+    // Add high-clarity OpenStreetMap tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      subdomains: ['a', 'b', 'c'],
+    }).addTo(map);
+
+    // Add campus outer boundary ring
+    const campusBoundary = L.circle([KLS_VDIT_CENTER.lat, KLS_VDIT_CENTER.lng], {
+      radius: 400,
+      color: '#315E63',
+      weight: 1.5,
+      dashArray: '6, 6',
+      fillColor: '#315E63',
+      fillOpacity: 0.03,
+    }).addTo(map);
+
+    campusBoundary.bindTooltip('KLS VDIT Campus Boundary', {
+      permanent: false,
+      direction: 'top',
+    });
+
+    mapInstanceRef.current = map;
 
     return () => {
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      map.remove();
+      mapInstanceRef.current = null;
     };
   }, []);
 
-  // 2. Real-time Proximity Calculations
-  // Campus Map is scaled to ~500m width x 400m height (1% x = 5m, 1% y = 4m)
-  const zonesWithDistances: ZoneWithDistance[] = useMemo(() => {
-    if (!radar?.campus_zones) return [];
+  // --- RENDER BUILDING & THREAT MARKERS ON MAP ---
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !buildings.length) return;
 
-    return radar.campus_zones
-      .map((zone) => {
-        const dxMeters = (userPos.x - zone.x_percent) * 5.0;
-        const dyMeters = (userPos.y - zone.y_percent) * 4.0;
-        const distanceMeters = Math.max(0, Math.round(Math.hypot(dxMeters, dyMeters)));
-        const isWithinRadius = distanceMeters <= zone.radius_meters;
-        const isApproaching = !isWithinRadius && distanceMeters <= zone.radius_meters + 60;
+    // Clear previous building markers
+    Object.values(buildingLayersRef.current).forEach((layerGroup) => {
+      map.removeLayer(layerGroup);
+    });
+    buildingLayersRef.current = {};
+
+    // Map each building with custom HTML marker matching screenshot exactly
+    buildings.forEach((bldg) => {
+      // Find matching radar telemetry zone
+      const zone = radar?.campus_zones?.find(
+        (z) => z.code === bldg.code || z.name.toLowerCase().includes(bldg.name.toLowerCase())
+      );
+
+      const threatLevel = zone?.threat_level || 'NORMAL';
+      const activeThreats = zone?.active_threats ?? (bldg.code === 'ENG-QUAD' ? 14 : bldg.code === 'ADMIN-BURSAR' ? 19 : bldg.code === 'LIB-COMMONS' ? 8 : bldg.code === 'STUDENT-UNION' ? 6 : 2);
+      const threatVector = zone?.top_threat_vector || (bldg.code === 'ENG-QUAD' ? 'Credential Harvester' : bldg.code === 'ADMIN-BURSAR' ? 'Impersonation Wire Phish' : bldg.code === 'LIB-COMMONS' ? 'Malicious QR Code' : bldg.code === 'STUDENT-UNION' ? 'Phishing SMS' : 'Standard Baseline');
+
+      const isRed = threatLevel === 'RED_ALERT';
+      const isElevated = threatLevel === 'ELEVATED';
+
+      const badgeBg = isRed ? '#C74747' : isElevated ? '#C58A35' : '#27845A';
+      const badgeIconSvg = isRed
+        ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+        : isElevated
+        ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>`
+        : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>`;
+
+      // Check if user or sim is currently at this building
+      const isUserHere =
+        gps.active &&
+        gps.lat &&
+        gps.lng &&
+        turf.distance(
+          turf.point([gps.lng, gps.lat]),
+          turf.point([bldg.longitude, bldg.latitude]),
+          { units: 'meters' }
+        ) <= bldg.radius_meters;
+
+      // Custom HTML Marker matching the uploaded screenshot card style
+      const customHtml = `
+        <div class="flex items-center gap-2 transform -translate-x-4 -translate-y-4 transition-transform hover:scale-105 cursor-pointer select-none">
+          <!-- Colored Circular Badge -->
+          <div style="background-color: ${badgeBg}; box-shadow: 0 4px 12px ${badgeBg}40;" 
+               class="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 border-2 border-white">
+            ${badgeIconSvg}
+          </div>
+
+          <!-- Clean White Pill Card -->
+          <div class="bg-white border border-[#E5E9ED] shadow-md px-3 py-1.5 rounded-2xl flex flex-col justify-center whitespace-nowrap min-w-[150px]">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-bold text-[#202A35]">${bldg.name.split('(')[0].trim()}</span>
+              ${
+                isUserHere
+                  ? `<span class="bg-[#202A35] text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">YOU</span>`
+                  : ''
+              }
+            </div>
+            <div class="text-[10px] text-[#64748B] flex items-center gap-1 font-medium mt-0.5">
+              <span>${activeThreats} threats</span>
+              <span>•</span>
+              <span class="truncate max-w-[130px]">${threatVector}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const customIcon = L.divIcon({
+        html: customHtml,
+        className: 'custom-radar-marker',
+        iconSize: [220, 48],
+        iconAnchor: [20, 24],
+      });
+
+      // Layer group for marker and radius circle
+      const layerGroup = L.layerGroup();
+
+      // Threat perimeter circle
+      const circle = L.circle([bldg.latitude, bldg.longitude], {
+        radius: bldg.radius_meters,
+        color: badgeBg,
+        weight: 1.5,
+        opacity: isRed ? 0.7 : 0.4,
+        fillColor: badgeBg,
+        fillOpacity: isRed ? 0.08 : 0.04,
+      });
+
+      const marker = L.marker([bldg.latitude, bldg.longitude], {
+        icon: customIcon,
+      });
+
+      marker.on('click', () => {
+        if (zone) {
+          setSelectedZone(zone);
+        } else {
+          setSelectedZone({
+            id: bldg.id,
+            name: bldg.name,
+            code: bldg.code,
+            category: bldg.building_type,
+            threat_level: threatLevel,
+            active_threats: activeThreats,
+            reported_incidents_today: 4,
+            radius_meters: bldg.radius_meters,
+            proximity_alert_active: isRed,
+            last_reported_attack: '15m ago (Telemetry Scan)',
+            top_threat_vector: threatVector,
+            x_percent: 50,
+            y_percent: 50,
+          });
+        }
+      });
+
+      layerGroup.addLayer(circle);
+      layerGroup.addLayer(marker);
+      layerGroup.addTo(map);
+
+      buildingLayersRef.current[bldg.id] = layerGroup;
+    });
+  }, [buildings, radar, gps.lat, gps.lng, gps.active]);
+
+  // --- LIVE GPS TRACKING ENGINE ---
+  const startGpsTracking = () => {
+    if (!('geolocation' in navigator)) {
+      setGps((prev) => ({ ...prev, status: 'UNAVAILABLE' }));
+      alert('Geolocation API is not supported on this browser or device.');
+      return;
+    }
+
+    setGps((prev) => ({ ...prev, status: 'INITIALIZING' }));
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy, speed, heading } = pos.coords;
+        const newGpsState: UserGpsState = {
+          active: true,
+          lat: latitude,
+          lng: longitude,
+          accuracy: accuracy ? Math.round(accuracy) : 8,
+          speed: speed ? Math.round(speed * 3.6) : 0,
+          heading: heading !== null && !isNaN(heading) ? Math.round(heading) : null,
+          lastUpdated: new Date().toLocaleTimeString(),
+          status: 'ACTIVE',
+        };
+        setGps(newGpsState);
+
+        // Update Leaflet User Marker & Accuracy Circle
+        const map = mapInstanceRef.current;
+        if (map) {
+          if (!userMarkerRef.current) {
+            const userIcon = L.divIcon({
+              html: `
+                <div class="relative flex items-center justify-center">
+                  <div class="w-7 h-7 rounded-full bg-[#315E63] border-3 border-white shadow-lg flex items-center justify-center text-white font-black text-[10px]">
+                    YOU
+                  </div>
+                  <div class="absolute -inset-2 rounded-full bg-[#315E63]/30 animate-ping pointer-events-none"></div>
+                </div>
+              `,
+              className: 'custom-user-marker',
+              iconSize: [28, 28],
+              iconAnchor: [14, 14],
+            });
+
+            userMarkerRef.current = L.marker([latitude, longitude], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+            userCircleRef.current = L.circle([latitude, longitude], {
+              radius: accuracy || 15,
+              color: '#315E63',
+              weight: 1,
+              fillColor: '#315E63',
+              fillOpacity: 0.1,
+            }).addTo(map);
+          } else {
+            userMarkerRef.current.setLatLng([latitude, longitude]);
+            if (userCircleRef.current) {
+              userCircleRef.current.setLatLng([latitude, longitude]);
+              userCircleRef.current.setRadius(accuracy || 15);
+            }
+          }
+        }
+      },
+      (err) => {
+        console.warn('Geolocation permission or device error:', err.message);
+        setGps((prev) => ({
+          ...prev,
+          active: false,
+          status: err.code === 1 ? 'DENIED' : 'UNAVAILABLE',
+        }));
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 3000,
+        timeout: 10000,
+      }
+    );
+  };
+
+  const stopGpsTracking = () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setGps((prev) => ({
+      ...prev,
+      active: false,
+      status: 'STOPPED',
+    }));
+
+    if (userMarkerRef.current && mapInstanceRef.current) {
+      mapInstanceRef.current.removeLayer(userMarkerRef.current);
+      userMarkerRef.current = null;
+    }
+    if (userCircleRef.current && mapInstanceRef.current) {
+      mapInstanceRef.current.removeLayer(userCircleRef.current);
+      userCircleRef.current = null;
+    }
+  };
+
+  const centerOnUser = () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    if (gps.lat && gps.lng) {
+      map.flyTo([gps.lat, gps.lng], 18, { duration: 1 });
+    } else if (sim.enabled) {
+      map.flyTo([sim.lat, sim.lng], 18, { duration: 1 });
+    } else {
+      map.flyTo([KLS_VDIT_CENTER.lat, KLS_VDIT_CENTER.lng], 17, { duration: 1 });
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  // --- MOVEMENT SIMULATOR (TEST MODE) ---
+  const toggleSimulator = () => {
+    setSim((prev) => {
+      const nextState = !prev.enabled;
+      if (nextState) {
+        // Render test simulator marker on map
+        const map = mapInstanceRef.current;
+        if (map && !simMarkerRef.current) {
+          const simIcon = L.divIcon({
+            html: `
+              <div class="relative flex items-center justify-center">
+                <div class="w-8 h-8 rounded-full bg-[#397C78] border-2 border-white shadow-lg flex items-center justify-center text-white font-bold">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/></svg>
+                </div>
+                <div class="absolute -top-6 whitespace-nowrap bg-[#397C78] text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow">
+                  TEST MODE
+                </div>
+              </div>
+            `,
+            className: 'custom-user-marker',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+          });
+          simMarkerRef.current = L.marker([prev.lat, prev.lng], { icon: simIcon, zIndexOffset: 900 }).addTo(map);
+        }
+      } else {
+        if (simMarkerRef.current && mapInstanceRef.current) {
+          mapInstanceRef.current.removeLayer(simMarkerRef.current);
+          simMarkerRef.current = null;
+        }
+      }
+      return { ...prev, enabled: nextState };
+    });
+  };
+
+  const handleSimMove = (direction: 'N' | 'S' | 'E' | 'W') => {
+    if (!sim.enabled) return;
+
+    // Convert meters to approximate degree delta
+    const meters = sim.stepMeters;
+    const deltaLat = (meters / 111139) * (direction === 'N' ? 1 : direction === 'S' ? -1 : 0);
+    const deltaLng =
+      (meters / (111139 * Math.cos((sim.lat * Math.PI) / 180))) *
+      (direction === 'E' ? 1 : direction === 'W' ? -1 : 0);
+
+    const newLat = sim.lat + deltaLat;
+    const newLng = sim.lng + deltaLng;
+    const addedDistance = meters;
+
+    // Check closest building
+    let closestBldgName: string | null = null;
+    let minD = Infinity;
+
+    buildings.forEach((b) => {
+      const d = turf.distance(turf.point([newLng, newLat]), turf.point([b.longitude, b.latitude]), {
+        units: 'meters',
+      });
+      if (d < minD) {
+        minD = d;
+        closestBldgName = b.name;
+      }
+    });
+
+    setSim((prev) => ({
+      ...prev,
+      lat: newLat,
+      lng: newLng,
+      totalDistanceTraveled: prev.totalDistanceTraveled + addedDistance,
+      activeBuildingName: minD <= 120 ? closestBldgName : 'Campus Walkway',
+    }));
+
+    if (simMarkerRef.current) {
+      simMarkerRef.current.setLatLng([newLat, newLng]);
+    }
+  };
+
+  const resetSimulator = () => {
+    const initLat = 15.3225;
+    const initLng = 74.7552;
+    setSim((prev) => ({
+      ...prev,
+      lat: initLat,
+      lng: initLng,
+      totalDistanceTraveled: 0,
+      activeBuildingName: 'Engineering & CS Quad (CSE & IT Labs)',
+    }));
+    if (simMarkerRef.current) {
+      simMarkerRef.current.setLatLng([initLat, initLng]);
+    }
+  };
+
+  // --- DISTANCE & GEOFENCE CALCULATIONS VIA TURF.JS ---
+  const activePosition = useMemo(() => {
+    if (gps.active && gps.lat && gps.lng) {
+      return { lat: gps.lat, lng: gps.lng, isSim: false };
+    }
+    if (sim.enabled) {
+      return { lat: sim.lat, lng: sim.lng, isSim: true };
+    }
+    // Default fallback to center
+    return { lat: KLS_VDIT_CENTER.lat, lng: KLS_VDIT_CENTER.lng, isSim: false };
+  }, [gps.active, gps.lat, gps.lng, sim.enabled, sim.lat, sim.lng]);
+
+  const buildingsWithDistances = useMemo(() => {
+    if (!buildings.length) return [];
+
+    const userPt = turf.point([activePosition.lng, activePosition.lat]);
+
+    return buildings
+      .map((bldg) => {
+        const bldgPt = turf.point([bldg.longitude, bldg.latitude]);
+        const distanceMeters = Math.round(turf.distance(userPt, bldgPt, { units: 'meters' }));
+        const isWithinRadius = distanceMeters <= bldg.radius_meters;
+        const isApproaching = !isWithinRadius && distanceMeters <= bldg.radius_meters + 60;
+
+        const zone = radar?.campus_zones?.find(
+          (z) => z.code === bldg.code || z.name.toLowerCase().includes(bldg.name.toLowerCase())
+        );
 
         return {
-          ...zone,
+          ...bldg,
           distanceMeters,
           isWithinRadius,
           isApproaching,
+          threatLevel: zone?.threat_level || 'NORMAL',
+          activeThreats: zone?.active_threats || 4,
+          topThreatVector: zone?.top_threat_vector || 'Standard Perimeter',
+          lastReportedAttack: zone?.last_reported_attack || '3m ago (Fake SSO Wi-Fi Portal)',
         };
       })
       .sort((a, b) => a.distanceMeters - b.distanceMeters);
-  }, [radar?.campus_zones, userPos]);
+  }, [buildings, activePosition, radar]);
 
-  const nearestZone = zonesWithDistances[0] || null;
-  const isUserInDangerZone = nearestZone?.threat_level === 'RED_ALERT' && nearestZone.isWithinRadius;
-  const isUserApproachingDanger = nearestZone?.threat_level === 'RED_ALERT' && nearestZone.isApproaching;
+  const nearestBuilding = buildingsWithDistances[0] || null;
+  const isInsideDangerZone =
+    nearestBuilding?.threatLevel === 'RED_ALERT' && nearestBuilding.isWithinRadius;
+  const isApproachingDanger =
+    nearestBuilding?.threatLevel === 'RED_ALERT' && nearestBuilding.isApproaching;
 
-  // 3. User Movement Controls (Click on Map, Step Pad, Walk toward Zone)
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!mapContainerRef.current) return;
-    const rect = mapContainerRef.current.getBoundingClientRect();
-    const clickX = ((e.clientX - rect.left) / rect.width) * 100;
-    const clickY = ((e.clientY - rect.top) / rect.height) * 100;
+  // Trigger audio alert when entering danger perimeter
+  useEffect(() => {
+    if (isInsideDangerZone) {
+      playAlertChime();
+    }
+  }, [isInsideDangerZone, playAlertChime]);
 
-    const clampedX = Math.max(5, Math.min(95, Math.round(clickX * 10) / 10));
-    const clampedY = Math.max(5, Math.min(95, Math.round(clickY * 10) / 10));
-
-    setUserPos({ x: clampedX, y: clampedY });
-    setGps((prev) => ({
-      ...prev,
-      lastUpdated: new Date().toLocaleTimeString(),
-      source: 'manual',
-    }));
-  };
-
-  const handleStepMove = (dxPercent: number, dyPercent: number) => {
-    setUserPos((prev) => ({
-      x: Math.max(5, Math.min(95, Math.round((prev.x + dxPercent) * 10) / 10)),
-      y: Math.max(5, Math.min(95, Math.round((prev.y + dyPercent) * 10) / 10)),
-    }));
-    setGps((prev) => ({
-      ...prev,
-      lastUpdated: new Date().toLocaleTimeString(),
-      source: 'simulation',
-    }));
-  };
-
-  const handleWalkToZone = (zone: CampusZoneTelemetry) => {
-    setTargetDestination(zone.id);
-    setIsSimulatingWalk(true);
-
-    const startX = userPos.x;
-    const startY = userPos.y;
-    const targetX = zone.x_percent;
-    const targetY = zone.y_percent;
-
-    const steps = 15;
-    let stepCount = 0;
-
-    const interval = setInterval(() => {
-      stepCount++;
-      const progress = stepCount / steps;
-      // Linear interpolation with slight jitter for realistic walking
-      const currentX = startX + (targetX - startX) * progress;
-      const currentY = startY + (targetY - startY) * progress;
-
-      setUserPos({
-        x: Math.round(currentX * 10) / 10,
-        y: Math.round(currentY * 10) / 10,
-      });
-
-      if (stepCount >= steps) {
-        clearInterval(interval);
-        setIsSimulatingWalk(false);
-        setTargetDestination(null);
-        setSelectedZone(zone);
-      }
-    }, movementSpeed === 'walk' ? 90 : 45);
-  };
-
+  // Handle Proximity Red Alert Broadcast
   const handleBroadcastAlert = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedZone) return;
@@ -247,9 +624,11 @@ export const RadarPage: React.FC = () => {
         title: `EMERGENCY RED ALERT: ${broadcastCategory}`,
         message: broadcastMessage,
         severity: 'CRITICAL',
-        action_instructions: 'Disconnect immediately from unverified networks or rogue APs. Verify official credentials on campus portal.',
+        action_instructions:
+          'Disconnect immediately from unverified networks or rogue APs. Verify official credentials on campus portal.',
         delivery_scope: 'PROXIMITY_MESH',
       });
+
       try {
         await api.broadcastProximityAlert({
           zone_id: selectedZone.id,
@@ -258,11 +637,14 @@ export const RadarPage: React.FC = () => {
           message: broadcastMessage,
         });
       } catch {
-        // ignore fallback
+        // Fallback catch
       }
-      setBroadcastSuccess(`🚨 RED ALERT dispatched to all devices within ${selectedZone.radius_meters}m of ${selectedZone.name}!`);
+
+      setBroadcastSuccess(
+        `🚨 RED ALERT dispatched to all devices within ${selectedZone.radius_meters}m of ${selectedZone.name}!`
+      );
       setBroadcastModalOpen(false);
-      fetchData();
+      fetchTelemetry();
     } catch (err: any) {
       alert(err.message || 'Broadcast failed');
     } finally {
@@ -270,42 +652,95 @@ export const RadarPage: React.FC = () => {
     }
   };
 
+  // Admin mapping actions
+  const handleCreateBuilding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.createCampusBuilding({
+        ...newBldgForm,
+        is_verified: true,
+        is_active: true,
+      });
+      alert('Building registered successfully!');
+      setNewBldgForm({
+        name: '',
+        code: '',
+        building_type: 'academic',
+        latitude: 15.3227,
+        longitude: 74.7549,
+        radius_meters: 120,
+        description: '',
+      });
+      fetchTelemetry();
+    } catch (err: any) {
+      alert(err.message || 'Failed to add building');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F7F8FA] text-[#202A35] pb-28 font-sans">
       <Header
-        title="Campus Cyber Radar & Live Proximity Mesh"
-        subtitle="Real-time device movement tracking & automated perimeter threat alerts"
+        title="Campus Intelligence Radar"
+        subtitle="Geospatial Proximity Mesh & Real-Time Threat Tracking — KLS VDIT Campus"
         showBack
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        {/* LIVE POSITION & GPS TELEMETRY STATUS BAR */}
-        <div className="p-4 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#315E63]/10 border border-[#315E63]/25 flex items-center justify-center text-[#315E63] shrink-0">
-              <Navigation className="w-5 h-5 animate-pulse" />
+        {/* TOP STATUS BAR: GPS TELEMETRY & TRACKING CONTROLS */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-[#315E63]/10 border border-[#315E63]/25 flex items-center justify-center text-[#315E63] shrink-0">
+              <Navigation className="w-6 h-6 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-[#315E63] uppercase tracking-wider">
-                  Live Position & Movement Engine
+                  Live Campus Geolocation Mesh
                 </span>
-                <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#27845A]/10 text-[#27845A] border border-[#27845A]/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#27845A] animate-ping" />
-                  {gps.active ? 'GPS Hardware Synchronized' : 'Interactive Mesh Simulation'}
+                <span
+                  className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    gps.status === 'ACTIVE'
+                      ? 'bg-[#27845A]/10 text-[#27845A] border-[#27845A]/20'
+                      : gps.status === 'DENIED'
+                      ? 'bg-[#C74747]/10 text-[#C74747] border-[#C74747]/20'
+                      : 'bg-[#64748B]/10 text-[#64748B] border-[#64748B]/20'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      gps.status === 'ACTIVE'
+                        ? 'bg-[#27845A] animate-ping'
+                        : gps.status === 'DENIED'
+                        ? 'bg-[#C74747]'
+                        : 'bg-[#64748B]'
+                    }`}
+                  />
+                  {gps.status === 'ACTIVE'
+                    ? 'GPS Active'
+                    : gps.status === 'DENIED'
+                    ? 'GPS Permission Denied'
+                    : 'GPS Inactive'}
                 </span>
               </div>
-              <div className="text-xs font-semibold text-[#202A35] mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+
+              <div className="text-xs font-semibold text-[#202A35] mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span>
-                  Current Sector: <strong className="text-[#315E63]">{nearestZone?.name || 'Campus Grounds'}</strong>
+                  Nearest Sector:{' '}
+                  <strong className="text-[#315E63]">{nearestBuilding?.name || 'Campus Grounds'}</strong>
                 </span>
                 <span className="text-[#64748B]">•</span>
                 <span>
-                  Grid Position: <span className="font-mono text-[#315E63]">({userPos.x}%, {userPos.y}%)</span>
+                  Distance:{' '}
+                  <strong className="font-mono text-[#315E63]">
+                    {nearestBuilding ? `${nearestBuilding.distanceMeters} m` : '--'}
+                  </strong>
                 </span>
                 <span className="text-[#64748B]">•</span>
                 <span>
-                  GPS Lat/Long: <span className="font-mono text-[#64748B]">{gps.latitude?.toFixed(4) ?? '37.4275'}°N, {gps.longitude?.toFixed(4) ?? '-122.1697'}°W</span>
+                  Coordinates:{' '}
+                  <span className="font-mono text-[#64748B]">
+                    {activePosition.lat.toFixed(5)}°N, {activePosition.lng.toFixed(5)}°E
+                  </span>
                 </span>
                 {gps.accuracy && (
                   <span className="text-[11px] text-[#64748B] font-mono">(±{gps.accuracy}m)</span>
@@ -314,32 +749,67 @@ export const RadarPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {gps.status !== 'ACTIVE' ? (
+              <button
+                onClick={startGpsTracking}
+                className="px-3.5 py-2 rounded-xl bg-[#315E63] hover:bg-[#274c50] text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <LocateFixed size={14} />
+                <span>Track My GPS</span>
+              </button>
+            ) : (
+              <button
+                onClick={stopGpsTracking}
+                className="px-3.5 py-2 rounded-xl bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#C74747] text-xs font-bold border border-[#E5E9ED] transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Square size={14} />
+                <span>Stop Tracking</span>
+              </button>
+            )}
+
             <button
-              onClick={() => {
-                // Center to nearest zone or reset to center
-                setUserPos({ x: 45, y: 52 }); // Main Library
-              }}
-              className="px-3 py-1.5 rounded-xl bg-[#F0F4F4] hover:bg-[#E5E9ED] text-xs font-bold text-[#315E63] border border-[#E5E9ED] transition flex items-center gap-1.5 cursor-pointer"
-              title="Reset position to campus center"
+              onClick={centerOnUser}
+              className="px-3 py-2 rounded-xl bg-white hover:bg-[#F0F4F4] text-xs font-bold text-[#315E63] border border-[#E5E9ED] transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Recenter Map View"
             >
-              <LocateFixed size={14} />
-              <span>Center to Library</span>
+              <Compass size={14} />
+              <span>Recenter</span>
             </button>
 
             <button
-              onClick={fetchData}
+              onClick={toggleSimulator}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                sim.enabled
+                  ? 'bg-[#397C78] text-white border-[#397C78]'
+                  : 'bg-white hover:bg-[#F0F4F4] text-[#397C78] border-[#E5E9ED]'
+              }`}
+            >
+              <Footprints size={14} />
+              <span>{sim.enabled ? 'Test Mode Active' : 'Movement Simulator'}</span>
+            </button>
+
+            <button
+              onClick={() => setAdminModalOpen(true)}
+              className="p-2 rounded-xl bg-white border border-[#E5E9ED] hover:bg-[#F0F4F4] text-[#64748B] hover:text-[#315E63] transition cursor-pointer shadow-xs"
+              title="Admin Campus Mapping Panel"
+            >
+              <Settings size={15} />
+            </button>
+
+            <button
+              onClick={fetchTelemetry}
               disabled={loading}
               className="p-2 rounded-xl bg-white border border-[#E5E9ED] hover:bg-[#F0F4F4] text-[#64748B] hover:text-[#315E63] transition cursor-pointer shadow-xs"
-              title="Refresh Radar Feeds"
+              title="Refresh Feeds"
             >
               <RefreshCw size={15} className={loading ? 'animate-spin text-[#315E63]' : ''} />
             </button>
           </div>
         </div>
 
-        {/* PROXIMITY ALERT BANNER (Triggers automatically as user moves into threat perimeter) */}
-        {isUserInDangerZone ? (
+        {/* PROXIMITY ALERT BANNER */}
+        {isInsideDangerZone ? (
           <div className="p-4 sm:p-5 rounded-2xl bg-[#C74747]/10 border-2 border-[#C74747] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in duration-300">
             <div className="flex items-start sm:items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-[#C74747] text-white flex items-center justify-center shrink-0 shadow-sm">
@@ -351,11 +821,12 @@ export const RadarPage: React.FC = () => {
                     🚨 IMMINENT RED ALERT IN YOUR EXACT LOCATION
                   </span>
                   <span className="text-xs text-[#C74747] font-bold font-mono">
-                    Distance: {nearestZone?.distanceMeters}m from Threat Beacon ({nearestZone?.name})
+                    YOU — {nearestBuilding?.distanceMeters}m from Threat Beacon ({nearestBuilding?.name})
                   </span>
                 </div>
                 <p className="text-xs text-[#202A35] font-semibold mt-1 leading-relaxed">
-                  Active Threat: <strong>{nearestZone?.last_reported_attack}</strong>. You are currently located inside the critical attack zone. Disconnect from unverified Wi-Fi and do not scan physical noticeboard QR codes.
+                  Active Threat: <strong>{nearestBuilding?.lastReportedAttack}</strong>. You are currently located inside
+                  the critical attack zone perimeter. Disconnect from unverified Wi-Fi APs and do not scan physical noticeboard QR codes.
                 </p>
               </div>
             </div>
@@ -363,7 +834,21 @@ export const RadarPage: React.FC = () => {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => {
-                  setSelectedZone(nearestZone);
+                  setSelectedZone({
+                    id: nearestBuilding.id,
+                    name: nearestBuilding.name,
+                    code: nearestBuilding.code,
+                    category: nearestBuilding.building_type,
+                    threat_level: nearestBuilding.threatLevel,
+                    active_threats: nearestBuilding.activeThreats,
+                    reported_incidents_today: 4,
+                    radius_meters: nearestBuilding.radius_meters,
+                    proximity_alert_active: true,
+                    last_reported_attack: nearestBuilding.lastReportedAttack,
+                    top_threat_vector: nearestBuilding.topThreatVector,
+                    x_percent: 50,
+                    y_percent: 50,
+                  });
                   setBroadcastModalOpen(true);
                 }}
                 className="px-4 py-2.5 bg-[#C74747] hover:bg-[#B33E3E] text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
@@ -373,16 +858,16 @@ export const RadarPage: React.FC = () => {
               </button>
             </div>
           </div>
-        ) : isUserApproachingDanger ? (
+        ) : isApproachingDanger ? (
           <div className="p-4 rounded-2xl bg-[#C58A35]/10 border border-[#C58A35]/40 shadow-sm flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-[#C58A35] shrink-0" />
               <div>
                 <span className="font-bold text-[#202A35]">
-                  ⚠️ Warning: Approaching Elevated Threat Zone ({nearestZone?.name})
+                  ⚠️ Warning: Approaching Elevated Threat Zone ({nearestBuilding?.name})
                 </span>
                 <span className="text-[#64748B] block mt-0.5">
-                  You are {nearestZone?.distanceMeters}m away. Expected perimeter boundary starts at {nearestZone?.radius_meters}m.
+                  You are {nearestBuilding?.distanceMeters}m away. Threat perimeter starts at {nearestBuilding?.radius_meters}m.
                 </span>
               </div>
             </div>
@@ -399,642 +884,625 @@ export const RadarPage: React.FC = () => {
           </div>
         )}
 
-        {/* Global/Campus Alert Status Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm">
+        {/* METRIC CARDS */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm">
             <div className="flex items-center justify-between text-xs font-bold text-[#64748B] uppercase tracking-wider">
-              <span>Live Campus Attacks</span>
-              <Activity className="w-4 h-4 text-[#315E63]" />
+              <span>Mapped Facilities</span>
+              <MapPin className="w-4 h-4 text-[#315E63]" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-[#202A35] mt-2">
-              {radar?.live_attacks_count ?? 184}
+            <div className="text-2xl font-extrabold text-[#202A35] mt-2">
+              {buildings.length || 8}
             </div>
-            <div className="text-[11px] text-[#27845A] mt-1 flex items-center gap-1 font-semibold">
-              <span>+14.2%</span> <span className="text-[#64748B] font-normal">telemetry frequency</span>
+            <div className="text-[11px] text-[#27845A] mt-1 font-semibold">
+              KLS VDIT Verified
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm">
             <div className="flex items-center justify-between text-xs font-bold text-[#64748B] uppercase tracking-wider">
               <span>Critical Red Alerts</span>
               <AlertTriangle className="w-4 h-4 text-[#C74747]" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-[#C74747] mt-2">
+            <div className="text-2xl font-extrabold text-[#C74747] mt-2">
               {radar?.critical_alerts_count ?? 2} Active
             </div>
-            <div className="text-[11px] text-[#64748B] mt-1">
-              Eng Quad & Bursar Hub
+            <div className="text-[11px] text-[#64748B] mt-1 truncate">
+              Eng Quad & Bursar
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm">
             <div className="flex items-center justify-between text-xs font-bold text-[#64748B] uppercase tracking-wider">
-              <span>Nearest Threat Distance</span>
+              <span>Nearest Threat</span>
               <Compass className="w-4 h-4 text-[#397C78]" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-[#315E63] mt-2 font-mono">
-              {nearestZone ? `${nearestZone.distanceMeters}m` : '--'}
+            <div className="text-2xl font-extrabold text-[#315E63] mt-2 font-mono">
+              {nearestBuilding ? `${nearestBuilding.distanceMeters} m` : '--'}
             </div>
             <div className="text-[11px] text-[#64748B] mt-1 truncate">
-              To {nearestZone?.name || 'Nearest Zone'}
+              To {nearestBuilding?.name.split('(')[0] || 'Perimeter'}
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm">
             <div className="flex items-center justify-between text-xs font-bold text-[#64748B] uppercase tracking-wider">
-              <span>Privacy Guardrail</span>
-              <CheckCircle className="w-4 h-4 text-[#27845A]" />
+              <span>Suspicious Zones</span>
+              <Radio className="w-4 h-4 text-[#C58A35]" />
             </div>
-            <div className="text-lg font-bold text-[#27845A] mt-2">
-              Zero-PII Anonymized
+            <div className="text-2xl font-extrabold text-[#C58A35] mt-2">
+              2 Zones
             </div>
             <div className="text-[11px] text-[#64748B] mt-1">
-              Differential privacy mesh active
+              Library & Dining Hall
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm col-span-2 md:col-span-1">
+            <div className="flex items-center justify-between text-xs font-bold text-[#64748B] uppercase tracking-wider">
+              <span>Privacy Shield</span>
+              <Shield className="w-4 h-4 text-[#27845A]" />
+            </div>
+            <div className="text-base font-bold text-[#27845A] mt-2">
+              Zero-PII Mesh
+            </div>
+            <div className="text-[11px] text-[#64748B] mt-1">
+              Differential Privacy
             </div>
           </div>
         </div>
 
-        {/* MAIN VISUAL SECTION: Interactive Campus Threat Map (Left) + Real-time Threat Feed & Proximity List (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* LEFT: Interactive Campus Map & Live Movement Controls */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="p-5 rounded-3xl bg-white border border-[#E5E9ED] shadow-sm relative overflow-hidden flex flex-col justify-between space-y-3">
-              {/* Map Title Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E5E9ED] gap-2 z-10">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#315E63]" />
-                  <h2 className="text-sm font-bold text-[#202A35] uppercase tracking-wider">
-                    Interactive Campus Proximity Mesh Map
-                  </h2>
-                </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="flex items-center gap-1 text-[11px] text-[#C74747] font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-[#C74747]" /> Red Alert
+        {/* MAIN VISUAL SECTION: INTERACTIVE LEAFLET CAMPUS MAP (PRIMARY) */}
+        <div className="p-5 sm:p-6 rounded-3xl bg-white border border-[#E5E9ED] shadow-sm relative overflow-hidden space-y-4">
+          {/* Header Bar matching Screenshot */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E5E9ED] gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-3 h-3 rounded-full bg-[#315E63]" />
+              <h2 className="text-sm font-bold text-[#202A35] uppercase tracking-wider">
+                Interactive Campus Proximity Mesh Map
+              </h2>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-[11px] text-[#C74747] font-semibold">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#C74747]" /> Red Alert Zone
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] text-[#C58A35] font-semibold">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#C58A35]" /> Elevated
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] text-[#27845A] font-semibold">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#27845A]" /> Secure
+              </span>
+            </div>
+          </div>
+
+          {/* Leaflet Map Surface */}
+          <div className="relative w-full h-[450px] sm:h-[520px] rounded-2xl overflow-hidden border border-[#E5E9ED] shadow-inner">
+            <div ref={mapElementRef} className="w-full h-full z-10" />
+
+            {/* Simulated Test Mode Watermark / Controls Overlay */}
+            {sim.enabled && (
+              <div className="absolute top-3 left-3 z-20 bg-white/95 backdrop-blur-sm border border-[#397C78] p-3 rounded-2xl shadow-lg flex flex-col gap-2 max-w-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-white bg-[#397C78] px-2 py-0.5 rounded">
+                    TEST MODE — Movement Simulator
                   </span>
-                  <span className="flex items-center gap-1 text-[11px] text-[#C58A35] font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-[#C58A35]" /> Elevated
-                  </span>
-                  <span className="flex items-center gap-1 text-[11px] text-[#27845A] font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-[#27845A]" /> Secure
-                  </span>
-                </div>
-              </div>
-
-              {/* Map Interactive Notice & Movement Tips */}
-              <div className="flex items-center justify-between text-[11px] text-[#64748B] px-1">
-                <span className="flex items-center gap-1">
-                  <Crosshair size={12} className="text-[#315E63]" />
-                  <span><strong>Click anywhere on the map</strong> to move your location live</span>
-                </span>
-                <span className="text-[#315E63] font-bold">
-                  Scale: 1% ≈ 5 meters
-                </span>
-              </div>
-
-              {/* The Map Surface */}
-              <div
-                ref={mapContainerRef}
-                onClick={handleMapClick}
-                className="relative my-2 w-full h-[420px] sm:h-[480px] rounded-2xl bg-[#F7F8FA] border border-[#E5E9ED] overflow-hidden shadow-inner flex items-center justify-center cursor-crosshair select-none"
-                style={{
-                  backgroundImage: `
-                    radial-gradient(circle at 50% 50%, rgba(49, 94, 99, 0.04) 0%, transparent 70%),
-                    linear-gradient(to right, rgba(229, 233, 237, 0.8) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(229, 233, 237, 0.8) 1px, transparent 1px)
-                  `,
-                  backgroundSize: '100% 100%, 36px 36px, 36px 36px',
-                }}
-              >
-                {/* Radar Sweep Animated Ring */}
-                <div
-                  className="absolute w-[460px] h-[460px] rounded-full border border-[#315E63]/10 pointer-events-none flex items-center justify-center animate-spin"
-                  style={{ animationDuration: '24s' }}
-                >
-                  <div className="w-[300px] h-[300px] rounded-full border border-[#315E63]/15" />
-                  <div className="w-[140px] h-[140px] rounded-full border border-[#315E63]/20" />
-                  <div className="absolute top-0 left-1/2 w-1/2 h-0.5 bg-gradient-to-r from-[#315E63]/25 to-transparent" />
-                </div>
-
-                {/* Dashed Range Line connecting YOU to Nearest Threat Node */}
-                {nearestZone && (
-                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
-                    <line
-                      x1={`${userPos.x}%`}
-                      y1={`${userPos.y}%`}
-                      x2={`${nearestZone.x_percent}%`}
-                      y2={`${nearestZone.y_percent}%`}
-                      stroke={nearestZone.threat_level === 'RED_ALERT' ? '#C74747' : '#315E63'}
-                      strokeWidth="2"
-                      strokeDasharray="4 4"
-                      strokeOpacity="0.6"
-                    />
-                  </svg>
-                )}
-
-                {/* Campus Zones / Facility Nodes */}
-                {zonesWithDistances.map((zone) => {
-                  const isSelected = selectedZone?.id === zone.id;
-                  const isRed = zone.threat_level === 'RED_ALERT';
-                  const isElevated = zone.threat_level === 'ELEVATED';
-
-                  return (
-                    <div
-                      key={zone.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedZone(zone);
-                      }}
-                      style={{
-                        left: `${zone.x_percent}%`,
-                        top: `${zone.y_percent}%`,
-                      }}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer group z-20"
-                    >
-                      {/* Perimeter Radius Visual Ring */}
-                      <div
-                        style={{
-                          width: `${(zone.radius_meters / 500) * 100 * 2.5}%`,
-                          height: `${(zone.radius_meters / 400) * 100 * 2.5}%`,
-                        }}
-                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none transition-all duration-300 ${
-                          isRed
-                            ? 'border border-[#C74747]/30 bg-[#C74747]/5'
-                            : isElevated
-                            ? 'border border-[#C58A35]/30 bg-[#C58A35]/5'
-                            : 'border border-[#27845A]/20 bg-[#27845A]/5'
-                        }`}
-                      />
-
-                      {/* Threat Radius Ping */}
-                      {isRed && (
-                        <div className="absolute -inset-4 rounded-full bg-[#C74747]/20 animate-ping pointer-events-none" />
-                      )}
-
-                      {/* Node Center Marker */}
-                      <div
-                        className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-xs transition-transform duration-200 group-hover:scale-110 shadow-sm border-2 ${
-                          isRed
-                            ? 'bg-[#C74747] text-white border-white'
-                            : isElevated
-                            ? 'bg-[#C58A35] text-white border-white'
-                            : 'bg-[#27845A] text-white border-white'
-                        } ${isSelected ? 'ring-4 ring-[#315E63] scale-110' : ''}`}
-                      >
-                        {isRed ? <AlertTriangle size={16} /> : isElevated ? <Radio size={16} /> : <Shield size={16} />}
-                      </div>
-
-                      {/* Tooltip with Real-Time Distance */}
-                      <div className="absolute left-1/2 -translate-x-1/2 top-10 whitespace-nowrap bg-white border border-[#E5E9ED] px-2.5 py-1 rounded-xl shadow-md text-center pointer-events-none z-30">
-                        <div className="text-[11px] font-bold text-[#202A35] flex items-center justify-center gap-1">
-                          <span>{zone.name}</span>
-                          <span className="text-[9px] font-mono text-[#315E63] font-bold">
-                            ({zone.distanceMeters}m)
-                          </span>
-                        </div>
-                        <div className="text-[9px] text-[#64748B]">
-                          {zone.active_threats} threats • {zone.top_threat_vector}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* DYNAMIC MOVING USER BEACON ("YOU") */}
-                <div
-                  style={{
-                    left: `${userPos.x}%`,
-                    top: `${userPos.y}%`,
-                  }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-300 pointer-events-none"
-                >
-                  {/* Proximity Coverage Bubble (User Personal Radius) */}
-                  <div className="w-20 h-20 -inset-6 rounded-full border-2 border-[#315E63]/30 bg-[#315E63]/10 absolute -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2 animate-ping" />
-
-                  {/* Pulsing Core */}
-                  <div className="w-6 h-6 rounded-full bg-[#315E63] border-3 border-white shadow-lg flex items-center justify-center text-white">
-                    <div className="w-2 h-2 rounded-full bg-white" />
-                  </div>
-
-                  {/* Floating YOU Badge with Real-time Distance */}
-                  <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-0.5 rounded-full bg-[#315E63] text-white text-[10px] font-bold shadow-md flex items-center gap-1 border border-white">
-                    <Navigation size={10} className="text-white fill-white" />
-                    <span>YOU</span>
-                    {nearestZone && (
-                      <span className="opacity-90 font-mono">
-                        ({nearestZone.distanceMeters}m to {nearestZone.code})
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* MOVEMENT SIMULATOR & STEP CONTROLLER */}
-              <div className="p-3.5 rounded-2xl bg-[#F7F8FA] border border-[#E5E9ED] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Footprints className="w-4 h-4 text-[#315E63]" />
-                  <span className="text-xs font-bold text-[#202A35]">Move / Walk Simulator:</span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setMovementSpeed('walk')}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-                        movementSpeed === 'walk'
-                          ? 'bg-[#315E63] text-white'
-                          : 'bg-white text-[#64748B] border border-[#E5E9ED]'
-                      }`}
-                    >
-                      Walk (1.5 m/s)
-                    </button>
-                    <button
-                      onClick={() => setMovementSpeed('run')}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-                        movementSpeed === 'run'
-                          ? 'bg-[#315E63] text-white'
-                          : 'bg-white text-[#64748B] border border-[#E5E9ED]'
-                      }`}
-                    >
-                      Sprint (4.0 m/s)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Step Arrow Direction Buttons */}
-                <div className="flex items-center gap-1 self-end sm:self-center">
-                  <span className="text-[10px] text-[#64748B] mr-1 font-medium">Step:</span>
                   <button
-                    onClick={() => handleStepMove(-4, 0)}
-                    className="p-1.5 rounded-lg bg-white border border-[#E5E9ED] hover:bg-[#F0F4F4] text-[#202A35] shadow-xs cursor-pointer"
-                    title="Step West (Left)"
+                    onClick={resetSimulator}
+                    className="p-1 text-[#64748B] hover:text-[#202A35]"
+                    title="Reset position"
                   >
-                    <ArrowLeft size={13} />
-                  </button>
-                  <button
-                    onClick={() => handleStepMove(0, -4)}
-                    className="p-1.5 rounded-lg bg-white border border-[#E5E9ED] hover:bg-[#F0F4F4] text-[#202A35] shadow-xs cursor-pointer"
-                    title="Step North (Up)"
-                  >
-                    <ArrowUp size={13} />
-                  </button>
-                  <button
-                    onClick={() => handleStepMove(0, 4)}
-                    className="p-1.5 rounded-lg bg-white border border-[#E5E9ED] hover:bg-[#F0F4F4] text-[#202A35] shadow-xs cursor-pointer"
-                    title="Step South (Down)"
-                  >
-                    <ArrowDown size={13} />
-                  </button>
-                  <button
-                    onClick={() => handleStepMove(4, 0)}
-                    className="p-1.5 rounded-lg bg-white border border-[#E5E9ED] hover:bg-[#F0F4F4] text-[#202A35] shadow-xs cursor-pointer"
-                    title="Step East (Right)"
-                  >
-                    <ArrowRight size={13} />
+                    <RotateCcw size={12} />
                   </button>
                 </div>
-              </div>
+                <div className="text-[11px] font-semibold text-[#202A35]">
+                  Building: <strong className="text-[#315E63]">{sim.activeBuildingName}</strong>
+                </div>
+                <div className="text-[10px] text-[#64748B] font-mono">
+                  Traveled: {sim.totalDistanceTraveled} m | Lat: {sim.lat.toFixed(5)}
+                </div>
 
-              {/* Quick Walk Destination Shortcut Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-1">
-                <span className="text-[11px] text-[#64748B] font-bold shrink-0">Walk to:</span>
-                {radar?.campus_zones?.map((zone) => (
+                {/* Speed Toggle */}
+                <div className="flex items-center gap-1 pt-1">
                   <button
-                    key={zone.id}
-                    onClick={() => handleWalkToZone(zone)}
-                    disabled={isSimulatingWalk}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer border ${
-                      targetDestination === zone.id
-                        ? 'bg-[#315E63] text-white border-[#315E63] animate-pulse'
-                        : 'bg-white hover:bg-[#F0F4F4] text-[#202A35] border-[#E5E9ED]'
+                    onClick={() => setSim((p) => ({ ...p, speedMode: 'walk', stepMeters: 10 }))}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
+                      sim.speedMode === 'walk'
+                        ? 'bg-[#315E63] text-white'
+                        : 'bg-[#F0F4F4] text-[#64748B]'
                     }`}
                   >
-                    {zone.name.split(' ')[0]}
+                    Walk (1.5 m/s)
                   </button>
-                ))}
-              </div>
+                  <button
+                    onClick={() => setSim((p) => ({ ...p, speedMode: 'sprint', stepMeters: 25 }))}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
+                      sim.speedMode === 'sprint'
+                        ? 'bg-[#315E63] text-white'
+                        : 'bg-[#F0F4F4] text-[#64748B]'
+                    }`}
+                  >
+                    Sprint (4.0 m/s)
+                  </button>
+                </div>
 
-              {/* Selected Zone Deep Dive Panel */}
-              {selectedZone && (
-                <div className="p-4 rounded-2xl bg-[#F7F8FA] border border-[#E5E9ED] flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-[#202A35]">{selectedZone.name}</h3>
-                      <span
-                        className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                          selectedZone.threat_level === 'RED_ALERT'
-                            ? 'bg-[#C74747]/10 text-[#C74747] border-[#C74747]/25'
-                            : selectedZone.threat_level === 'ELEVATED'
-                            ? 'bg-[#C58A35]/10 text-[#C58A35] border-[#C58A35]/25'
-                            : 'bg-[#27845A]/10 text-[#27845A] border-[#27845A]/25'
-                        }`}
-                      >
-                        {selectedZone.threat_level.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#64748B]">
-                      Recent Activity: {selectedZone.last_reported_attack} • Coverage: {selectedZone.radius_meters}m radius
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
+                {/* Virtual D-Pad Controls */}
+                <div className="pt-2 flex flex-col items-center">
+                  <button
+                    onClick={() => handleSimMove('N')}
+                    className="p-1.5 rounded-lg bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] font-bold cursor-pointer shadow-xs mb-1"
+                    title="Move North"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setBroadcastModalOpen(true)}
-                      className="px-4 py-2 bg-[#C74747] hover:bg-[#B33E3E] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                      onClick={() => handleSimMove('W')}
+                      className="p-1.5 rounded-lg bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] font-bold cursor-pointer shadow-xs"
+                      title="Move West"
                     >
-                      <Bell size={14} />
-                      <span>Dispatch Alert to {selectedZone.code}</span>
+                      <ArrowLeft size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleSimMove('S')}
+                      className="p-1.5 rounded-lg bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] font-bold cursor-pointer shadow-xs"
+                      title="Move South"
+                    >
+                      <ArrowDown size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleSimMove('E')}
+                      className="p-1.5 rounded-lg bg-[#F0F4F4] hover:bg-[#E5E9ED] text-[#202A35] font-bold cursor-pointer shadow-xs"
+                      title="Move East"
+                    >
+                      <ArrowRight size={16} />
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* LOWER ACTION CARD MATCHING EXACT SCREENSHOT */}
+          {selectedZone && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-base font-extrabold text-[#202A35]">
+                    {selectedZone.name}
+                  </h3>
+                  <span
+                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider ${
+                      selectedZone.threat_level === 'RED_ALERT'
+                        ? 'bg-[#C74747]/15 text-[#C74747] border border-[#C74747]/30'
+                        : selectedZone.threat_level === 'ELEVATED'
+                        ? 'bg-[#C58A35]/15 text-[#C58A35] border border-[#C58A35]/30'
+                        : 'bg-[#27845A]/15 text-[#27845A] border border-[#27845A]/30'
+                    }`}
+                  >
+                    {selectedZone.threat_level.replace('_', ' ')}
+                  </span>
+                </div>
+                <p className="text-xs text-[#64748B] flex items-center gap-2">
+                  <span>Recent Activity: {selectedZone.last_reported_attack}</span>
+                  <span>•</span>
+                  <span>Coverage: {selectedZone.radius_meters}m radius</span>
+                </p>
+              </div>
+
+              <div className="shrink-0">
+                <button
+                  onClick={() => setBroadcastModalOpen(true)}
+                  className="px-5 py-2.5 bg-[#C74747] hover:bg-[#b33e3e] text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-2 cursor-pointer"
+                >
+                  <Bell size={15} />
+                  <span>Dispatch Alert to {selectedZone.code || 'ZONE'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* BOTTOM SECTION: CAMPUS INCIDENT RADAR LIST & PROXIMITY TABLE */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Facility List with Real Distances */}
+          <div className="lg:col-span-7 bg-white p-5 rounded-3xl border border-[#E5E9ED] shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5E9ED]">
+              <h3 className="text-xs font-bold text-[#202A35] uppercase tracking-wider flex items-center gap-2">
+                <Compass className="w-4 h-4 text-[#315E63]" />
+                <span>Campus Proximity Directory ({buildingsWithDistances.length} Facilities)</span>
+              </h3>
+              <span className="text-[11px] text-[#64748B] font-mono">
+                Calculated from current position
+              </span>
+            </div>
+
+            <div className="divide-y divide-[#E5E9ED] max-h-[360px] overflow-y-auto pr-1">
+              {buildingsWithDistances.map((b) => (
+                <div
+                  key={b.id}
+                  onClick={() => {
+                    const zone = radar?.campus_zones?.find(
+                      (z) => z.code === b.code || z.name.toLowerCase().includes(b.name.toLowerCase())
+                    );
+                    if (zone) setSelectedZone(zone);
+                  }}
+                  className="py-3 px-2 flex items-center justify-between hover:bg-[#F0F4F4] rounded-xl transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white shrink-0 ${
+                        b.threatLevel === 'RED_ALERT'
+                          ? 'bg-[#C74747]'
+                          : b.threatLevel === 'ELEVATED'
+                          ? 'bg-[#C58A35]'
+                          : 'bg-[#27845A]'
+                      }`}
+                    >
+                      {b.threatLevel === 'RED_ALERT' ? '!' : b.threatLevel === 'ELEVATED' ? '▲' : '✓'}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#202A35] flex items-center gap-1.5">
+                        <span>{b.name}</span>
+                        {b.isWithinRadius && (
+                          <span className="text-[9px] bg-[#315E63] text-white px-1.5 py-0.2 rounded font-black">
+                            WITHIN PERIMETER
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-[#64748B]">
+                        {b.activeThreats} threats • {b.topThreatVector}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-xs font-mono font-bold text-[#315E63]">
+                      {b.distanceMeters} m
+                    </div>
+                    <div className="text-[10px] text-[#64748B]">
+                      radius: {b.radius_meters}m
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Active Real Incident Feed */}
+          <div className="lg:col-span-5 bg-white p-5 rounded-3xl border border-[#E5E9ED] shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5E9ED]">
+              <h3 className="text-xs font-bold text-[#202A35] uppercase tracking-wider flex items-center gap-2">
+                <Activity className="w-4 h-4 text-[#C74747]" />
+                <span>Live Reported Threats</span>
+              </h3>
+              <span className="text-[11px] text-[#27845A] font-semibold">
+                Anonymized Zero-PII
+              </span>
+            </div>
+
+            <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+              {incidents.length > 0 ? (
+                incidents.slice(0, 5).map((inc) => (
+                  <div
+                    key={inc.id}
+                    onClick={() => setSelectedIncident(inc)}
+                    className="p-3 rounded-2xl border border-[#E5E9ED] hover:border-[#315E63]/40 bg-[#F7F8FA] hover:bg-white transition cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-[#202A35] uppercase tracking-wide">
+                        {inc.category.replace('_', ' ')}
+                      </span>
+                      <span
+                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                          inc.severity === 'critical'
+                            ? 'bg-[#C74747]/15 text-[#C74747]'
+                            : inc.severity === 'high'
+                            ? 'bg-[#C58A35]/15 text-[#C58A35]'
+                            : 'bg-[#477B9B]/15 text-[#477B9B]'
+                        }`}
+                      >
+                        {inc.severity}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#64748B] mt-1 line-clamp-2">
+                      {inc.description}
+                    </p>
+                    <div className="flex items-center justify-between text-[10px] text-[#64748B] mt-2 pt-2 border-t border-[#E5E9ED]/60">
+                      <span>Status: {inc.status}</span>
+                      <span>{new Date(inc.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-xs text-[#64748B]">
+                  No active incidents pending triage.
                 </div>
               )}
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* RIGHT: Live Nearby Threat Alerts & Real-Time Telemetry Feed */}
-          <div className="lg:col-span-5 space-y-4">
-            {/* LIVE NEARBY ALERTS (Ranked by User Proximity in Real Time) */}
-            <div className="p-5 rounded-3xl bg-white border border-[#E5E9ED] shadow-sm space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-[#E5E9ED]">
-                <div className="flex items-center gap-2">
-                  <Radio className="w-4 h-4 text-[#C74747] animate-pulse" />
-                  <h3 className="text-sm font-bold text-[#202A35] uppercase tracking-wider">
-                    Nearby Threats by Distance
-                  </h3>
+      {/* MODAL: BROADCAST RED ALERT TO NEARBY PHONES */}
+      {broadcastModalOpen && selectedZone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-[#E5E9ED] shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E5E9ED] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#C74747]/10 flex items-center justify-center text-[#C74747]">
+                  <AlertTriangle size={18} />
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#315E63]/10 text-[#315E63]">
-                  {zonesWithDistances.length} Active Beacons
-                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-[#202A35]">
+                    Dispatch Campus Mesh Alert
+                  </h3>
+                  <p className="text-[11px] text-[#64748B]">
+                    Target: {selectedZone.name} ({selectedZone.radius_meters}m)
+                  </p>
+                </div>
               </div>
-
-              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
-                {zonesWithDistances.map((zone) => {
-                  const isRed = zone.threat_level === 'RED_ALERT';
-                  const isElevated = zone.threat_level === 'ELEVATED';
-
-                  return (
-                    <div
-                      key={zone.id}
-                      onClick={() => setSelectedZone(zone)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                        zone.isWithinRadius
-                          ? isRed
-                            ? 'bg-[#C74747]/10 border-[#C74747]/40 ring-1 ring-[#C74747]'
-                            : 'bg-[#C58A35]/10 border-[#C58A35]/40'
-                          : 'bg-[#F7F8FA] border-[#E5E9ED] hover:bg-white hover:border-[#315E63]/30'
-                      }`}
-                    >
-                      <div className="min-w-0 space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-[#202A35] truncate">{zone.name}</span>
-                          {zone.isWithinRadius && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#C74747] text-white uppercase">
-                              In Perimeter
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-[#64748B] truncate">
-                          Threat: {zone.top_threat_vector}
-                        </p>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <div className="text-xs font-extrabold font-mono text-[#202A35]">
-                          {zone.distanceMeters}m
-                        </div>
-                        <div
-                          className={`text-[10px] font-bold uppercase ${
-                            isRed ? 'text-[#C74747]' : isElevated ? 'text-[#C58A35]' : 'text-[#27845A]'
-                          }`}
-                        >
-                          {zone.threat_level.replace('_', ' ')}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <button
+                onClick={() => setBroadcastModalOpen(false)}
+                className="text-[#64748B] hover:text-[#202A35]"
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            {/* Real-Time Telemetry Event Log */}
-            <div className="p-5 rounded-3xl bg-white border border-[#E5E9ED] shadow-sm space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-[#E5E9ED]">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-[#315E63]" />
-                  <h3 className="text-sm font-bold text-[#202A35] uppercase tracking-wider">
-                    Real-Time Incident Stream
-                  </h3>
-                </div>
-                <span className="text-[10px] text-[#64748B] bg-[#F7F8FA] border border-[#E5E9ED] px-2 py-0.5 rounded font-mono font-bold">
-                  ANONYMIZED
+            <form onSubmit={handleBroadcastAlert} className="space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-[#202A35] block mb-1">
+                  Threat Category
+                </label>
+                <select
+                  value={broadcastCategory}
+                  onChange={(e) => setBroadcastCategory(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-[#E5E9ED] bg-[#F7F8FA] focus:outline-none focus:border-[#315E63] font-semibold"
+                >
+                  <option value="Phishing Outbreak">Phishing Outbreak</option>
+                  <option value="Credential Harvester">Credential Harvester</option>
+                  <option value="Malicious QR Code">Malicious QR Code</option>
+                  <option value="Impersonation Wire Phish">Impersonation Wire Phish</option>
+                  <option value="Rogue Wi-Fi Access Point">Rogue Wi-Fi Access Point</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-[#202A35] block mb-1">
+                  Urgent Advisory Message
+                </label>
+                <textarea
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-xl border border-[#E5E9ED] bg-[#F7F8FA] focus:outline-none focus:border-[#315E63] font-medium resize-none"
+                  required
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#F0F4F4] text-[11px] text-[#315E63] flex items-start gap-2">
+                <Info size={14} className="shrink-0 mt-0.5" />
+                <span>
+                  This broadcast will trigger an audible alert and notification on all student devices within range.
                 </span>
               </div>
 
-              {/* Feed Items Table */}
-              <div className="space-y-2.5 overflow-y-auto max-h-[300px] pr-1">
-                {radar?.realtime_threat_feed?.map((event) => (
-                  <div
-                    key={event.id}
-                    className="p-3 rounded-xl bg-[#F7F8FA] border border-[#E5E9ED] hover:bg-white hover:border-[#315E63]/30 transition space-y-2 shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-[#315E63] bg-[#315E63]/10 px-1.5 py-0.2 rounded border border-[#315E63]/25 font-bold">
-                          {event.id}
-                        </span>
-                        <span className="text-xs font-bold text-[#202A35]">{event.category}</span>
-                      </div>
-                      <span
-                        className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                          event.severity === 'critical'
-                            ? 'bg-[#C74747]/10 text-[#C74747] border border-[#C74747]/25'
-                            : event.severity === 'high'
-                            ? 'bg-[#C58A35]/10 text-[#C58A35] border border-[#C58A35]/25'
-                            : 'bg-[#27845A]/10 text-[#27845A] border border-[#27845A]/25'
-                        }`}
-                      >
-                        {event.severity}
-                      </span>
-                    </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setBroadcastModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-[#64748B] hover:bg-[#F0F4F4] font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={broadcasting}
+                  className="px-4 py-2 rounded-xl bg-[#C74747] hover:bg-[#b33e3e] text-white font-bold cursor-pointer transition shadow-sm flex items-center gap-1.5"
+                >
+                  <Zap size={14} />
+                  <span>{broadcasting ? 'Broadcasting...' : 'Dispatch Alert'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-                    <div className="text-xs font-mono text-[#202A35] truncate bg-white p-2 rounded-lg border border-[#E5E9ED]">
-                      {event.threat_vector}
-                    </div>
+      {/* MODAL: ADMIN CAMPUS MAPPING PANEL */}
+      {adminModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-[#E5E9ED] shadow-2xl max-w-xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#E5E9ED] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#315E63]/10 flex items-center justify-center text-[#315E63]">
+                  <Settings size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#202A35]">
+                    Admin Campus Mapping & Geofence Panel
+                  </h3>
+                  <p className="text-[11px] text-[#64748B]">
+                    Configure campus facilities, verified coordinates and boundary radii
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAdminModalOpen(false)}
+                className="text-[#64748B] hover:text-[#202A35]"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-[#64748B] pt-1 border-t border-[#E5E9ED]">
-                      <span className="flex items-center gap-1 text-[#202A35] font-medium">
-                        <MapPin size={11} className="text-[#315E63]" /> {event.campus_zone}
+            <form onSubmit={handleCreateBuilding} className="space-y-3 text-xs">
+              <div className="font-bold text-[#202A35] uppercase text-[11px] tracking-wider text-[#315E63]">
+                Register New Facility / Perimeter
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-[#202A35] block mb-1">Building Name</label>
+                  <input
+                    type="text"
+                    value={newBldgForm.name}
+                    onChange={(e) => setNewBldgForm({ ...newBldgForm, name: e.target.value })}
+                    placeholder="e.g. Science Annex"
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E9ED] bg-[#F7F8FA]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-[#202A35] block mb-1">Building Code</label>
+                  <input
+                    type="text"
+                    value={newBldgForm.code}
+                    onChange={(e) => setNewBldgForm({ ...newBldgForm, code: e.target.value })}
+                    placeholder="e.g. SCI-ANNEX"
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E9ED] bg-[#F7F8FA]"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="font-semibold text-[#202A35] block mb-1">Latitude</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={newBldgForm.latitude}
+                    onChange={(e) => setNewBldgForm({ ...newBldgForm, latitude: parseFloat(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E9ED] bg-[#F7F8FA] font-mono"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-[#202A35] block mb-1">Longitude</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={newBldgForm.longitude}
+                    onChange={(e) => setNewBldgForm({ ...newBldgForm, longitude: parseFloat(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E9ED] bg-[#F7F8FA] font-mono"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-[#202A35] block mb-1">Radius (Meters)</label>
+                  <input
+                    type="number"
+                    value={newBldgForm.radius_meters}
+                    onChange={(e) => setNewBldgForm({ ...newBldgForm, radius_meters: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E9ED] bg-[#F7F8FA] font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-[#315E63] text-white font-bold cursor-pointer hover:bg-[#274c50] transition flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  <span>Register Building</span>
+                </button>
+              </div>
+            </form>
+
+            <div className="border-t border-[#E5E9ED] pt-3">
+              <div className="font-bold text-[#202A35] text-xs mb-2">
+                Currently Mapped Buildings ({buildings.length})
+              </div>
+              <div className="max-h-48 overflow-y-auto divide-y divide-[#E5E9ED] text-xs">
+                {buildings.map((b) => (
+                  <div key={b.id} className="py-2 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-[#202A35]">{b.name}</span>
+                      <span className="text-[#64748B] block text-[10px]">
+                        {b.latitude.toFixed(4)}, {b.longitude.toFixed(4)} • {b.radius_meters}m
                       </span>
-                      <span className="text-[#315E63] font-mono font-semibold">
-                        {event.anonymized_reporter}
-                      </span>
-                      <span className="text-[#64748B] font-mono">{event.timestamp_display}</span>
                     </div>
+                    <span className="text-[10px] text-[#27845A] font-semibold bg-[#27845A]/10 px-2 py-0.5 rounded">
+                      Verified
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* BOTTOM SECTION: 7-Day Trend Analytics & Top Attack Vectors */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 7-Day Trend Chart */}
-          <div className="p-6 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
+      {/* MODAL: INCIDENT DETAIL VIEWER */}
+      {selectedIncident && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-[#E5E9ED] shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E5E9ED] pb-3">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-[#315E63]" />
-                <h3 className="text-sm font-bold text-[#202A35]">Aggregated Threat Trend by Time</h3>
+                <div className="w-8 h-8 rounded-xl bg-[#C74747]/10 flex items-center justify-center text-[#C74747]">
+                  <AlertTriangle size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#202A35]">
+                    Incident Dossier #{selectedIncident.id.slice(0, 8)}
+                  </h3>
+                  <p className="text-[11px] text-[#64748B]">
+                    Category: {selectedIncident.category.replace('_', ' ').toUpperCase()}
+                  </p>
+                </div>
               </div>
-              <span className="text-xs text-[#64748B]">7-Day Rolling Window</span>
+              <button
+                onClick={() => setSelectedIncident(null)}
+                className="text-[#64748B] hover:text-[#202A35]"
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="space-y-2.5 pt-2">
-              {radar?.trends?.map((item, idx) => {
-                const total = item.incidents + item.scans;
-                const maxVal = Math.max(...(radar.trends?.map((d) => d.incidents + d.scans) || [1]), 1);
-                const pct = Math.min(100, Math.round((total / maxVal) * 100));
+            <div className="space-y-3 text-xs">
+              <div>
+                <span className="font-bold text-[#202A35] block mb-1">Description</span>
+                <p className="p-3 rounded-xl bg-[#F7F8FA] border border-[#E5E9ED] text-[#202A35]">
+                  {selectedIncident.description}
+                </p>
+              </div>
 
-                return (
-                  <div key={idx} className="flex items-center gap-3 text-xs">
-                    <span className="w-16 font-mono text-[#64748B] text-[11px]">{item.date}</span>
-                    <div className="flex-1 bg-[#F0F4F4] rounded-full h-3 overflow-hidden flex">
-                      <div
-                        style={{ width: `${pct}%` }}
-                        className="bg-[#315E63] rounded-full h-full transition-all duration-500"
-                      />
-                    </div>
-                    <span className="w-16 text-right font-bold text-[#202A35] text-xs">
-                      {total} events
-                    </span>
+              {selectedIncident.suspicious_content && (
+                <div>
+                  <span className="font-bold text-[#202A35] block mb-1">Suspicious Content / Payload</span>
+                  <div className="p-2.5 rounded-xl bg-[#F7F8FA] border border-[#E5E9ED] font-mono text-[11px] text-[#C74747] break-all">
+                    {selectedIncident.suspicious_content}
                   </div>
-                );
-              })}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="p-2.5 rounded-xl bg-[#F7F8FA] border border-[#E5E9ED]">
+                  <span className="text-[10px] text-[#64748B] uppercase font-bold block">Severity</span>
+                  <span className="font-bold text-[#C74747] capitalize">{selectedIncident.severity}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#F7F8FA] border border-[#E5E9ED]">
+                  <span className="text-[10px] text-[#64748B] uppercase font-bold block">Status</span>
+                  <span className="font-bold text-[#315E63] capitalize">{selectedIncident.status}</span>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Top Attack Vectors & Categories */}
-          <div className="p-6 rounded-2xl bg-white border border-[#E5E9ED] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BarChart2 className="w-4 h-4 text-[#315E63]" />
-                <h3 className="text-sm font-bold text-[#202A35]">Top Attack Vectors Distribution</h3>
-              </div>
-              <span className="text-xs text-[#64748B]">By Threat Category</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="p-4 rounded-xl bg-[#F7F8FA] border border-[#E5E9ED] space-y-1">
-                <span className="text-xs text-[#64748B] font-medium">Phishing & Credential Theft</span>
-                <div className="text-xl font-bold text-[#C74747]">{radar?.phishing_count ?? 14} Reports</div>
-                <div className="w-full bg-[#E5E9ED] h-1.5 rounded-full overflow-hidden mt-1">
-                  <div className="bg-[#C74747] h-full w-[65%]" />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#F7F8FA] border border-[#E5E9ED] space-y-1">
-                <span className="text-xs text-[#64748B] font-medium">Malicious Noticeboard QR</span>
-                <div className="text-xl font-bold text-[#C58A35]">{radar?.qr_threats_count ?? 8} Scans</div>
-                <div className="w-full bg-[#E5E9ED] h-1.5 rounded-full overflow-hidden mt-1">
-                  <div className="bg-[#C58A35] h-full w-[45%]" />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#F7F8FA] border border-[#E5E9ED] space-y-1">
-                <span className="text-xs text-[#64748B] font-medium">Authority Impersonation</span>
-                <div className="text-xl font-bold text-[#C58A35]">{radar?.impersonation_count ?? 5} Events</div>
-                <div className="w-full bg-[#E5E9ED] h-1.5 rounded-full overflow-hidden mt-1">
-                  <div className="bg-[#C58A35] h-full w-[35%]" />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#F7F8FA] border border-[#E5E9ED] space-y-1">
-                <span className="text-xs text-[#64748B] font-medium">Fee Wire & Financial Scams</span>
-                <div className="text-xl font-bold text-[#315E63]">{radar?.payment_fraud_count ?? 3} Detected</div>
-                <div className="w-full bg-[#E5E9ED] h-1.5 rounded-full overflow-hidden mt-1">
-                  <div className="bg-[#315E63] h-full w-[25%]" />
-                </div>
-              </div>
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setSelectedIncident(null)}
+                className="px-4 py-2 rounded-xl bg-[#315E63] text-white font-bold cursor-pointer hover:bg-[#274c50]"
+              >
+                Close Dossier
+              </button>
             </div>
           </div>
         </div>
-
-        {/* MODAL: Dispatch Proximity Red Alert to Nearby Devices */}
-        {broadcastModalOpen && selectedZone && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="w-full max-w-lg bg-white border border-[#E5E9ED] rounded-3xl p-6 space-y-5 shadow-2xl">
-              <div className="flex items-center justify-between pb-3 border-b border-[#E5E9ED]">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-[#C74747]" />
-                  <h3 className="text-base font-bold text-[#202A35]">Broadcast Red Alert</h3>
-                </div>
-                <button
-                  onClick={() => setBroadcastModalOpen(false)}
-                  className="w-8 h-8 rounded-lg bg-[#F7F8FA] border border-[#E5E9ED] text-[#64748B] hover:text-[#202A35] flex items-center justify-center cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <form onSubmit={handleBroadcastAlert} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#202A35] mb-1">Target Campus Zone</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={`${selectedZone.name} (${selectedZone.radius_meters}m Proximity Mesh)`}
-                    className="w-full bg-[#F7F8FA] border border-[#E5E9ED] rounded-xl p-3 text-xs text-[#315E63] font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#202A35] mb-1">Alert Threat Category</label>
-                  <select
-                    value={broadcastCategory}
-                    onChange={(e) => setBroadcastCategory(e.target.value)}
-                    className="w-full bg-[#F7F8FA] border border-[#E5E9ED] rounded-xl p-3 text-xs text-[#202A35] focus:outline-none focus:border-[#315E63]"
-                  >
-                    <option value="Phishing Outbreak">Phishing Outbreak (Fake SSO)</option>
-                    <option value="Malicious QR Overlay">Malicious QR Noticeboard Sticker</option>
-                    <option value="Rogue Wi-Fi Access Point">Rogue Wi-Fi Access Point Spoofing</option>
-                    <option value="Bursar Fee Wire Scam">Bursar Fee Wire Smish</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#202A35] mb-1">Emergency Warning Message</label>
-                  <textarea
-                    rows={3}
-                    value={broadcastMessage}
-                    onChange={(e) => setBroadcastMessage(e.target.value)}
-                    className="w-full bg-[#F7F8FA] border border-[#E5E9ED] rounded-xl p-3 text-xs text-[#202A35] placeholder-[#64748B] focus:outline-none focus:border-[#315E63]"
-                    required
-                  />
-                </div>
-
-                <div className="p-3 bg-[#C74747]/10 border border-[#C74747]/25 rounded-xl text-[11px] text-[#C74747] leading-relaxed font-medium">
-                  ⚠️ This warning will trigger real-time banner alerts and push notifications on connected student and staff apps currently located in {selectedZone.name}.
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setBroadcastModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-[#64748B] hover:text-[#202A35] hover:bg-[#F0F4F4] cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={broadcasting}
-                    className="px-5 py-2.5 bg-[#C74747] hover:bg-[#B33E3E] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
-                  >
-                    <Zap size={14} />
-                    <span>{broadcasting ? 'Transmitting Alert...' : 'Dispatch Red Alert Mesh'}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };
+
 export default RadarPage;

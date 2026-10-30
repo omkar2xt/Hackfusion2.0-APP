@@ -492,3 +492,194 @@ export interface InstitutionTree {
   total_alerts_active: number;
 }
 
+export interface CampusBuilding {
+  id: string;
+  name: string;
+  code: string;
+  building_type: string;
+  latitude: number;
+  longitude: number;
+  radius_meters: number;
+  description: string;
+  contact_lead?: string;
+  is_verified: boolean;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GeofenceAlert {
+  zone_id: string;
+  zone_name: string;
+  threat_level: string;
+  distance_meters: number;
+  is_inside: boolean;
+  is_approaching: boolean;
+  warning_message: string;
+  top_threat_vector?: string;
+}
+
+export interface GeofenceCheckResponse {
+  user_latitude: number;
+  user_longitude: number;
+  timestamp: string;
+  in_campus_bounds: boolean;
+  closest_building_id?: string | null;
+  closest_building_name?: string | null;
+  closest_building_distance_meters?: number | null;
+  alerts: GeofenceAlert[];
+}
+
+// --- PART 4: Advanced Cyber Investigation & Threat Intelligence ---
+export interface TechnicalIndicator {
+  name: string;
+  category: string;
+  evidence_source: string;
+  timestamp: string;
+  status: 'CONFIRMED' | 'INFERRED' | 'UNVERIFIED' | 'SUSPICIOUS';
+  details: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+}
+
+export interface DnsRecordInfo {
+  record_type: string;
+  value: string;
+  ttl?: number;
+}
+
+export interface TlsCertificateInfo {
+  subject: string;
+  issuer: string;
+  valid_from?: string;
+  valid_to?: string;
+  fingerprint_sha256: string;
+  is_valid: boolean;
+  cipher_suite?: string;
+}
+
+export interface InfrastructureIntel {
+  domain: string;
+  ip_addresses: string[];
+  asn?: string;
+  asn_org?: string;
+  hosting_provider?: string;
+  country?: string;
+  dns_records: DnsRecordInfo[];
+  tls_certificate?: TlsCertificateInfo;
+  redirect_chain: string[];
+  is_url_shortener: boolean;
+  unpacked_destination?: string;
+}
+
+export interface UrlInvestigationResponse {
+  normalized_url: string;
+  scheme: string;
+  hostname: string;
+  port?: number | null;
+  path: string;
+  query_params: Record<string, string>;
+  verdict: 'CONFIRMED_MALICIOUS' | 'SUSPICIOUS' | 'UNDER_INVESTIGATION' | 'LOW_RISK' | 'UNKNOWN';
+  risk_score: number;
+  severity: string;
+  evidence_confidence: string;
+  potential_impact: string;
+  infrastructure: InfrastructureIntel;
+  indicators: TechnicalIndicator[];
+  typosquatting_target?: string | null;
+  credential_harvesting_detected: boolean;
+  ssrf_safe: boolean;
+  ssrf_note?: string | null;
+  investigated_at: string;
+}
+
+export interface QrInvestigationResponse {
+  decoded_payload: string;
+  payload_type: 'URL' | 'WIFI' | 'PAYMENT' | 'VCARD_CONTACT' | 'TEXT_PLAIN' | 'APP_DEEP_LINK';
+  payload_hash_sha256: string;
+  image_hash_sha256?: string | null;
+  verdict: 'CONFIRMED_MALICIOUS' | 'SUSPICIOUS' | 'UNDER_INVESTIGATION' | 'LOW_RISK' | 'UNKNOWN';
+  risk_score: number;
+  severity: string;
+  evidence_confidence: string;
+  potential_impact: string;
+  url_destination?: string | null;
+  url_investigation?: UrlInvestigationResponse | null;
+  wifi_config?: Record<string, string> | null;
+  payment_info?: Record<string, string> | null;
+  contact_info?: Record<string, string> | null;
+  indicators: TechnicalIndicator[];
+  reuse_count_across_campus: number;
+  related_incident_ids: string[];
+  security_explanation: string;
+  investigated_at: string;
+}
+
+export interface AttributionItem {
+  observed_facts: string[];
+  technical_inferences: string[];
+  unverified_hypotheses: string[];
+  confirmed_findings: string[];
+  source_ip?: string | null;
+  destination_ip?: string | null;
+  source_port?: number | null;
+  destination_port?: number | null;
+  protocol?: string | null;
+  timestamp_with_tz: string;
+  session_id?: string | null;
+  user_agent?: string | null;
+  network_provider?: string | null;
+  attribution_confidence: string;
+  attribution_disclaimer: string;
+}
+
+export interface EvidenceVaultItem {
+  id: string;
+  incident_id?: string | null;
+  evidence_type: string;
+  file_hash_sha256: string;
+  raw_payload_preview: string;
+  source_origin: string;
+  uploaded_by: string;
+  chain_of_custody: Array<{ timestamp: string; action: string; user: string }>;
+  created_at: string;
+}
+
+export interface IncidentCorrelationItem {
+  incident_id: string;
+  related_incident_id: string;
+  correlation_factor: string;
+  match_strength: 'CONFIRMED_MATCH' | 'WEAK_SIMILARITY';
+  shared_indicator: string;
+  reason: string;
+}
+
+export interface VictimImpactSummary {
+  total_affected_reports: number;
+  potentially_exposed_accounts: number;
+  credential_submissions_reported: number;
+  affected_departments: string[];
+  affected_device_count: number;
+  assessment_note: string;
+}
+
+export interface InvestigationReport {
+  report_id: string;
+  incident_id: string;
+  incident_title: string;
+  generated_at: string;
+  incident_summary: string;
+  attack_type: string;
+  timeline: Array<{ timestamp: string; stage: string; event: string }>;
+  url_or_qr_analysis: Record<string, any>;
+  technical_indicators: TechnicalIndicator[];
+  infrastructure?: InfrastructureIntel | null;
+  affected_users_and_systems: VictimImpactSummary;
+  evidence_vault_references: string[];
+  related_incidents: string[];
+  attribution: AttributionItem;
+  recommended_containment_steps: string[];
+  investigation_status: string;
+}
+
+
+

@@ -28,6 +28,14 @@ import type {
   RegisterDevicePayload,
   AlertDeliveryMetric,
   InstitutionTree,
+  CampusBuilding,
+  GeofenceCheckResponse,
+  UrlInvestigationResponse,
+  QrInvestigationResponse,
+  EvidenceVaultItem,
+  IncidentCorrelationItem,
+  AttributionItem,
+  InvestigationReport,
 } from '../types';
 
 class ApiService {
@@ -392,6 +400,95 @@ class ApiService {
   // --- PART 2: Hierarchical Database Tree Architecture ---
   async getInstitutionalHierarchy(): Promise<InstitutionTree> {
     return this.request<InstitutionTree>('/api/v1/alerts/hierarchy/tree', {
+      method: 'GET',
+    });
+  }
+
+  // --- PART 3: Campus Geospatial Intelligence Radar & Geofencing ---
+  async getCampusBuildings(): Promise<CampusBuilding[]> {
+    return this.request<CampusBuilding[]>('/api/v1/campus/buildings', {
+      method: 'GET',
+    });
+  }
+
+  async createCampusBuilding(data: Partial<CampusBuilding>): Promise<CampusBuilding> {
+    return this.request<CampusBuilding>('/api/v1/campus/buildings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCampusBuilding(buildingId: string, data: Partial<CampusBuilding>): Promise<CampusBuilding> {
+    return this.request<CampusBuilding>(`/api/v1/campus/buildings/${encodeURIComponent(buildingId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async checkGeofence(data: { latitude: number; longitude: number; accuracy_meters?: number }): Promise<GeofenceCheckResponse> {
+    return this.request<GeofenceCheckResponse>('/api/v1/campus/geofence-check', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // --- PART 4: Advanced Cyber Investigation & Threat Intelligence ---
+  async investigateUrl(url: string, incidentId?: string): Promise<UrlInvestigationResponse> {
+    return this.request<UrlInvestigationResponse>('/api/v1/investigation/url', {
+      method: 'POST',
+      body: JSON.stringify({ url, incident_id: incidentId }),
+    });
+  }
+
+  async investigateQr(
+    decodedPayload: string,
+    imageMetadata?: any,
+    imageHashSha256?: string,
+    incidentId?: string
+  ): Promise<QrInvestigationResponse> {
+    return this.request<QrInvestigationResponse>('/api/v1/investigation/qr', {
+      method: 'POST',
+      body: JSON.stringify({
+        decoded_payload: decodedPayload,
+        image_metadata: imageMetadata,
+        image_hash_sha256: imageHashSha256,
+        incident_id: incidentId,
+      }),
+    });
+  }
+
+  async getEvidenceVault(): Promise<EvidenceVaultItem[]> {
+    return this.request<EvidenceVaultItem[]>('/api/v1/investigation/vault', {
+      method: 'GET',
+    });
+  }
+
+  async depositEvidence(data: {
+    incident_id?: string;
+    evidence_type: string;
+    raw_content: string;
+    source_origin?: string;
+  }): Promise<EvidenceVaultItem> {
+    return this.request<EvidenceVaultItem>('/api/v1/investigation/vault', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getIncidentCorrelations(): Promise<IncidentCorrelationItem[]> {
+    return this.request<IncidentCorrelationItem[]>('/api/v1/investigation/correlation', {
+      method: 'GET',
+    });
+  }
+
+  async getIncidentAttribution(incidentId: string): Promise<AttributionItem> {
+    return this.request<AttributionItem>(`/api/v1/investigation/attribution/${encodeURIComponent(incidentId)}`, {
+      method: 'GET',
+    });
+  }
+
+  async getInvestigationReport(incidentId: string): Promise<InvestigationReport> {
+    return this.request<InvestigationReport>(`/api/v1/investigation/report/${encodeURIComponent(incidentId)}`, {
       method: 'GET',
     });
   }
