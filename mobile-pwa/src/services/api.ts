@@ -42,10 +42,29 @@ class ApiService {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+      });
+    } catch (networkError: any) {
+      clearTimeout(timeoutId);
+      if (networkError.name === 'AbortError') {
+        const error = new Error(`Request to ${endpoint} timed out after 10s`) as Error & { statusCode: number };
+        error.statusCode = 408;
+        throw error;
+      }
+      const error = new Error(`Cannot connect to backend server at ${this.baseUrl}. Please ensure the FastAPI server is running.`) as Error & { statusCode: number };
+      error.statusCode = 503;
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       let errorDetail: string;

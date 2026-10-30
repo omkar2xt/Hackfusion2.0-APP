@@ -26,26 +26,24 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [_error, setError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const fetchStats = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
-    setError(null);
+    setApiError(null);
 
     try {
       const data = await api.getDashboardStats();
       setStats(data);
-    } catch (err) {
-      console.warn('Backend dashboard stats not reachable, loading fallback view:', err);
-      // Fallback data clearly labeled as offline/demo if API is unreachable
-      setStats({
-        total_scans: 0,
-        suspicious_results: 0,
-        reported_incidents: 0,
-        recent_scans: [],
-        recent_incidents: [],
-      });
+      setApiError(null);
+    } catch (err: any) {
+      console.warn('Backend dashboard stats not reachable:', err);
+      setApiError(
+        err.message ||
+          'Cannot connect to backend server. Ensure the FastAPI service is running on port 8000.'
+      );
+      setStats(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -129,23 +127,44 @@ export default function DashboardPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 mt-6 space-y-6">
+        {/* Backend Connection Alert */}
+        {apiError && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3">
+            <AlertTriangle size={20} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-white">Backend Server Disconnected</p>
+              <p className="mt-0.5 text-amber-300/90 leading-relaxed">
+                {apiError}
+              </p>
+              <button
+                onClick={() => fetchStats(true)}
+                disabled={refreshing}
+                className="mt-2.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-[11px] flex items-center gap-1.5 border border-amber-500/40 transition-colors"
+              >
+                <RotateCw size={13} className={refreshing ? 'animate-spin' : ''} />
+                Retry Connection
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Stat Cards Grid */}
         <div className="grid grid-cols-3 gap-3">
           <StatCard
             label="Total Scans"
-            value={loading ? '...' : stats?.total_scans ?? 0}
+            value={loading ? '...' : apiError && !stats ? '-' : stats?.total_scans ?? 0}
             icon={<Search size={18} />}
             color="teal"
           />
           <StatCard
             label="Suspicious"
-            value={loading ? '...' : stats?.suspicious_results ?? 0}
+            value={loading ? '...' : apiError && !stats ? '-' : stats?.suspicious_results ?? 0}
             icon={<ShieldAlert size={18} />}
             color="amber"
           />
           <StatCard
             label="Reported"
-            value={loading ? '...' : stats?.reported_incidents ?? 0}
+            value={loading ? '...' : apiError && !stats ? '-' : stats?.reported_incidents ?? 0}
             icon={<AlertTriangle size={18} />}
             color="purple"
           />
