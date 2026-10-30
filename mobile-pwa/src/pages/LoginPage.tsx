@@ -1,12 +1,23 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { validateEmail } from '../utils/helpers';
+import Logo from '../components/Logo';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { signIn } = useAuthContext();
+  const { signIn, demoSignIn } = useAuthContext();
+
+  const handleDemoSignIn = async (role: 'student' | 'admin' = 'student') => {
+    setLoading(true);
+    try {
+      await demoSignIn(role);
+      navigate('/dashboard', { replace: true });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,10 +55,14 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-[#0a0f1e] via-[#0d1326] to-[#111827] px-6 py-12">
       {/* Branding */}
       <div className="mb-10 flex flex-col items-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/25">
-          <Shield className="h-7 w-7 text-white" strokeWidth={2} />
-        </div>
-        <h1 className="text-2xl font-bold text-white">SignalSafe Campus</h1>
+        <Logo size="xl" variant="full" showText={false} className="mb-3" />
+        <h1 className="text-3xl font-black text-white tracking-wider uppercase">YODHRA</h1>
+        <p className="text-xs font-semibold text-cyan-400 tracking-widest uppercase mt-0.5">
+          CYBER INTELLIGENCE • CAMPUS
+        </p>
+        <p className="text-[11px] text-slate-400 font-mono tracking-wider mt-1">
+          DEFEND • DETECT • RESPOND
+        </p>
       </div>
 
       {/* Form */}
@@ -142,6 +157,32 @@ export default function LoginPage() {
           {loading && <Loader2 className="h-5 w-5 animate-spin" />}
           {loading ? 'Signing In...' : 'Sign In'}
         </button>
+
+        {/* Quick Demo Access Divider */}
+        <div className="relative flex items-center justify-center py-1">
+          <div className="w-full border-t border-slate-700/60" />
+          <span className="absolute bg-[#0d1326] px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            or instant access
+          </span>
+        </div>
+
+        {/* 1-Click Demo Buttons */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleDemoSignIn('student')}
+            className="flex items-center justify-center py-2.5 px-3 rounded-xl bg-slate-800/80 border border-teal-500/30 hover:border-teal-500/60 text-teal-300 font-semibold text-xs transition"
+          >
+            Demo Student
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDemoSignIn('admin')}
+            className="flex items-center justify-center py-2.5 px-3 rounded-xl bg-slate-800/80 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-300 font-semibold text-xs transition"
+          >
+            Security Admin
+          </button>
+        </div>
 
         {/* Sign up link */}
         <p className="text-center text-sm text-slate-400">

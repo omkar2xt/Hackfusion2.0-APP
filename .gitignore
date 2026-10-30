@@ -6,6 +6,15 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+*.db
+*.sqlite
+*.sqlite3
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
 
 # Logs
 logs

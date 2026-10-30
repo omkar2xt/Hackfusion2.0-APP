@@ -1,8 +1,9 @@
 import { useState, useMemo, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Mail, Lock, Eye, EyeOff, User, Loader2, Check, X } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User, Loader2, Check, X } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { validateEmail } from '../utils/helpers';
+import Logo from '../components/Logo';
 
 interface PasswordStrength {
   hasMinLength: boolean;
@@ -47,7 +48,7 @@ function StrengthIndicator({ strength }: { strength: PasswordStrength }) {
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { signUp } = useAuthContext();
+  const { signUp, demoSignIn } = useAuthContext();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -99,11 +100,11 @@ export default function SignupPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-[#0a0f1e] via-[#0d1326] to-[#111827] px-6 py-12">
       {/* Branding */}
       <div className="mb-8 flex flex-col items-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/25">
-          <Shield className="h-7 w-7 text-white" strokeWidth={2} />
-        </div>
-        <h1 className="text-2xl font-bold text-white">Create Account</h1>
-        <p className="mt-1 text-sm text-slate-400">Join SignalSafe Campus</p>
+        <Logo size="lg" showText={false} className="mb-2.5" />
+        <h1 className="text-2xl font-black text-white tracking-wider uppercase">YODHRA</h1>
+        <p className="mt-0.5 text-xs text-cyan-400 font-semibold uppercase tracking-wider">
+          Create Incident Responder Account
+        </p>
       </div>
 
       {/* Form */}
@@ -247,6 +248,25 @@ export default function SignupPage() {
         >
           {loading && <Loader2 className="h-5 w-5 animate-spin" />}
           {loading ? 'Creating Account...' : 'Create Account'}
+        </button>
+
+        {/* Quick Demo Access Divider */}
+        <div className="relative flex items-center justify-center py-1">
+          <div className="w-full border-t border-slate-700/60" />
+          <span className="absolute bg-[#0d1326] px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            or instant access
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={async () => {
+            await demoSignIn('student');
+            navigate('/dashboard', { replace: true });
+          }}
+          className="w-full flex items-center justify-center py-2.5 px-3 rounded-xl bg-slate-800/80 border border-teal-500/30 hover:border-teal-500/60 text-teal-300 font-semibold text-xs transition"
+        >
+          Instant Campus Student Demo Access
         </button>
 
         {/* Sign in link */}

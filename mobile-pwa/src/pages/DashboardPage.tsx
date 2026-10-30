@@ -11,8 +11,13 @@ import {
   Clock,
   ArrowRight,
   ExternalLink,
+  Radio,
+  Dna,
+  GitFork,
+  Award,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
+import Header from '../components/Header';
 import { api } from '../services/api';
 import type { DashboardStats, ScanResult, Incident } from '../types';
 import StatCard from '../components/StatCard';
@@ -26,26 +31,24 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [_error, setError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const fetchStats = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
-    setError(null);
+    setApiError(null);
 
     try {
       const data = await api.getDashboardStats();
       setStats(data);
-    } catch (err) {
-      console.warn('Backend dashboard stats not reachable, loading fallback view:', err);
-      // Fallback data clearly labeled as offline/demo if API is unreachable
-      setStats({
-        total_scans: 0,
-        suspicious_results: 0,
-        reported_incidents: 0,
-        recent_scans: [],
-        recent_incidents: [],
-      });
+      setApiError(null);
+    } catch (err: any) {
+      console.warn('Backend dashboard stats not reachable:', err);
+      setApiError(
+        err.message ||
+          'Cannot connect to backend server. Ensure the FastAPI service is running on port 8000.'
+      );
+      setStats(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -60,92 +63,117 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-slate-100 pb-24">
+      {/* Top Header with Desktop Navigation */}
+      <Header />
+
       {/* Top Banner / Welcome */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-[#111827] to-[#0a0f1e] px-4 pt-6 pb-6 border-b border-slate-800/80">
-        <div className="flex items-center justify-between max-w-lg mx-auto">
+      <div className="relative overflow-hidden bg-gradient-to-b from-[#111827] to-[#0a0f1e] px-4 sm:px-6 lg:px-8 pt-6 pb-6 border-b border-slate-800/80">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-teal-400 font-semibold tracking-wide uppercase">
+              <span className="text-xs sm:text-sm text-teal-400 font-semibold tracking-wide uppercase">
                 Campus Security Guard
               </span>
             </div>
-            <h1 className="text-xl font-bold text-white mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-white mt-1">
               Welcome, {user?.full_name ? user.full_name.split(' ')[0] : 'Campus User'} 👋
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Think Before You Click • Real-time Threat Analysis
+            <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+              Think Before You Click • Real-time Threat Analysis & Incident Response
             </p>
           </div>
 
-          <button
-            onClick={() => fetchStats(true)}
-            disabled={refreshing || loading}
-            aria-label="Refresh dashboard"
-            className="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-300 hover:text-teal-400 transition-colors active:scale-95 disabled:opacity-50"
-          >
-            <RotateCw size={17} className={refreshing ? 'animate-spin text-teal-400' : ''} />
-          </button>
-        </div>
-
-        {/* Security Status Card */}
-        <div className="max-w-lg mx-auto mt-4">
-          <div
-            className={`p-4 rounded-2xl border flex items-center justify-between ${
-              hasSuspicious
-                ? 'bg-amber-500/10 border-amber-500/30'
-                : 'bg-teal-500/10 border-teal-500/30'
-            }`}
-          >
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
+            {/* Security Status Card */}
+            <div
+              className={`p-3.5 sm:p-4 rounded-2xl border flex items-center gap-3.5 flex-1 md:flex-initial min-w-[280px] ${
+                hasSuspicious
+                  ? 'bg-amber-500/10 border-amber-500/30'
+                  : 'bg-teal-500/10 border-teal-500/30'
+              }`}
+            >
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                   hasSuspicious ? 'bg-amber-500/20 text-amber-400' : 'bg-teal-500/20 text-teal-400'
                 }`}
               >
                 {hasSuspicious ? <ShieldAlert size={22} /> : <ShieldCheck size={22} />}
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">
-                  {hasSuspicious ? 'Security Attention Needed' : 'Campus Shield Active'}
-                </h3>
-                <p className="text-xs text-slate-300">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xs sm:text-sm font-semibold text-white truncate">
+                    {hasSuspicious ? 'Attention Needed' : 'Campus Shield Active'}
+                  </h3>
+                  <span
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full uppercase tracking-wider ${
+                      hasSuspicious
+                        ? 'bg-amber-500/20 text-amber-300'
+                        : 'bg-teal-500/20 text-teal-300'
+                    }`}
+                  >
+                    {hasSuspicious ? 'Alert' : 'Protected'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 truncate mt-0.5">
                   {hasSuspicious
-                    ? `${stats?.suspicious_results} suspicious item(s) detected recently`
-                    : 'No immediate threats flagged on your profile'}
+                    ? `${stats?.suspicious_results} suspicious item(s) detected`
+                    : 'No immediate threats detected'}
                 </p>
               </div>
             </div>
-            <span
-              className={`px-2.5 py-1 text-[11px] font-semibold rounded-full uppercase tracking-wider ${
-                hasSuspicious
-                  ? 'bg-amber-500/20 text-amber-300'
-                  : 'bg-teal-500/20 text-teal-300'
-              }`}
+
+            <button
+              onClick={() => fetchStats(true)}
+              disabled={refreshing || loading}
+              aria-label="Refresh dashboard"
+              className="w-10 h-10 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-300 hover:text-teal-400 transition-colors active:scale-95 disabled:opacity-50 flex-shrink-0"
+              title="Refresh Stats"
             >
-              {hasSuspicious ? 'Alert' : 'Protected'}
-            </span>
+              <RotateCw size={17} className={refreshing ? 'animate-spin text-teal-400' : ''} />
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 mt-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+        {/* Backend Connection Alert */}
+        {apiError && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3">
+            <AlertTriangle size={20} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-white">Backend Server Disconnected</p>
+              <p className="mt-0.5 text-amber-300/90 leading-relaxed">
+                {apiError}
+              </p>
+              <button
+                onClick={() => fetchStats(true)}
+                disabled={refreshing}
+                className="mt-2.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-[11px] flex items-center gap-1.5 border border-amber-500/40 transition-colors"
+              >
+                <RotateCw size={13} className={refreshing ? 'animate-spin' : ''} />
+                Retry Connection
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Stat Cards Grid */}
         <div className="grid grid-cols-3 gap-3">
           <StatCard
             label="Total Scans"
-            value={loading ? '...' : stats?.total_scans ?? 0}
+            value={loading ? '...' : apiError && !stats ? '-' : stats?.total_scans ?? 0}
             icon={<Search size={18} />}
             color="teal"
           />
           <StatCard
             label="Suspicious"
-            value={loading ? '...' : stats?.suspicious_results ?? 0}
+            value={loading ? '...' : apiError && !stats ? '-' : stats?.suspicious_results ?? 0}
             icon={<ShieldAlert size={18} />}
             color="amber"
           />
           <StatCard
             label="Reported"
-            value={loading ? '...' : stats?.reported_incidents ?? 0}
+            value={loading ? '...' : apiError && !stats ? '-' : stats?.reported_incidents ?? 0}
             icon={<AlertTriangle size={18} />}
             color="purple"
           />
@@ -158,7 +186,7 @@ export default function DashboardPage() {
               Quick Actions
             </h2>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <QuickActionCard
               title="Scan URL"
               description="Verify suspicious link"
@@ -189,6 +217,67 @@ export default function DashboardPage() {
             />
           </div>
         </div>
+
+        {/* Innovation Features & Intelligence Hub */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-teal-400">
+              Campus Intelligence Hub
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <div
+              onClick={() => navigate('/radar')}
+              className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 cursor-pointer transition space-y-1.5 hover:bg-slate-900"
+            >
+              <div className="flex items-center justify-between">
+                <Radio className="w-5 h-5 text-teal-400" />
+                <span className="text-[10px] uppercase font-bold text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">Live</span>
+              </div>
+              <h3 className="font-bold text-xs sm:text-sm text-slate-100">Cyber Radar</h3>
+              <p className="text-[11px] text-slate-400">Campus threat trends & exposure</p>
+            </div>
+
+            <div
+              onClick={() => navigate('/threat-dna')}
+              className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 cursor-pointer transition space-y-1.5 hover:bg-slate-900"
+            >
+              <div className="flex items-center justify-between">
+                <Dna className="w-5 h-5 text-cyan-400" />
+                <span className="text-[10px] uppercase font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">DNA</span>
+              </div>
+              <h3 className="font-bold text-xs sm:text-sm text-slate-100">Attack DNA</h3>
+              <p className="text-[11px] text-slate-400">Campaign group & fingerprinting</p>
+            </div>
+
+            <div
+              onClick={() => navigate('/trust-graph')}
+              className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 cursor-pointer transition space-y-1.5 hover:bg-slate-900"
+            >
+              <div className="flex items-center justify-between">
+                <GitFork className="w-5 h-5 text-teal-300" />
+                <span className="text-[10px] uppercase font-bold text-teal-300 bg-teal-500/10 px-1.5 py-0.5 rounded">Auth</span>
+              </div>
+              <h3 className="font-bold text-xs sm:text-sm text-slate-100">Trust Graph</h3>
+              <p className="text-[11px] text-slate-400">Official directory & spoof check</p>
+            </div>
+
+            <div
+              onClick={() => navigate('/coach')}
+              className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 cursor-pointer transition space-y-1.5 hover:bg-slate-900"
+            >
+              <div className="flex items-center justify-between">
+                <Award className="w-5 h-5 text-amber-400" />
+                <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">Coach</span>
+              </div>
+              <h3 className="font-bold text-xs sm:text-sm text-slate-100">Safety Coach</h3>
+              <p className="text-[11px] text-slate-400">Adaptive quizzes & score level</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 2-Column Desktop Grid for Recent Scans & Recent Incidents */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Recent Scans */}
         <div>
@@ -307,6 +396,7 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>

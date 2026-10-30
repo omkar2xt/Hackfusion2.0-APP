@@ -13,7 +13,8 @@ import {
 import Header from '../components/Header';
 import ScanResultCard from '../components/ScanResultCard';
 import { useScan } from '../hooks/useScan';
-import type { ScanResult } from '../types';
+import { api } from '../services/api';
+import type { ScanResult, QrAnalysisResult } from '../types';
 
 export default function QrScannerPage() {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function QrScannerPage() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [decodedContent, setDecodedContent] = useState<string | null>(null);
   const [manualInput, setManualInput] = useState('');
+  const [qrGuardianResult, setQrGuardianResult] = useState<QrAnalysisResult | null>(null);
 
   const qrInstanceRef = useRef<Html5Qrcode | null>(null);
   const { result, loading, error: apiError, scanQr, reset } = useScan();
@@ -68,7 +70,8 @@ export default function QrScannerPage() {
           // Found QR Code!
           setDecodedContent(decodedText);
           await stopCamera();
-          // Automatically trigger security inspection on the decoded content
+          // Deep inspection with QR Guardian & scan engine
+          api.analyzeQrGuardian({ raw_qr_content: decodedText }).then(setQrGuardianResult).catch(() => {});
           await scanQr(decodedText);
         },
         (_parseError) => {
@@ -95,6 +98,7 @@ export default function QrScannerPage() {
     if (!trimmed) return;
 
     setDecodedContent(trimmed);
+    api.analyzeQrGuardian({ raw_qr_content: trimmed }).then(setQrGuardianResult).catch(() => {});
     await scanQr(trimmed);
   };
 
@@ -111,6 +115,7 @@ export default function QrScannerPage() {
   const handleReset = async () => {
     await stopCamera();
     setDecodedContent(null);
+    setQrGuardianResult(null);
     setManualInput('');
     setCameraError(null);
     reset();
@@ -123,7 +128,7 @@ export default function QrScannerPage() {
         subtitle="Analyze poster & sticker QR codes safely"
       />
 
-      <div className="max-w-lg mx-auto px-4 pt-4 space-y-5">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         {/* Mode Selector */}
         <div className="grid grid-cols-2 p-1 bg-slate-900 rounded-2xl border border-slate-800">
           <button
@@ -280,6 +285,36 @@ export default function QrScannerPage() {
               <AlertTriangle size={12} />
               <span>For campus safety, SignalSafe never auto-opens decoded QR links.</span>
             </div>
+
+            {/* Feature 4: QR Guardian Registry Match */}
+            {qrGuardianResult && (
+              <div className={`mt-3 p-3 rounded-xl border text-xs space-y-1 ${
+                qrGuardianResult.is_verified
+                  ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                  : 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+              }`}>
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center gap-1.5">
+                    {qrGuardianResult.is_verified ? (
+                      <CheckCircle2 size={14} className="text-emerald-400" />
+                    ) : (
+                      <AlertTriangle size={14} className="text-amber-400" />
+                    )}
+                    {qrGuardianResult.is_verified
+                      ? 'Verified Official Campus Destination'
+                      : 'Unverified External QR Code'}
+                  </span>
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border">
+                    {qrGuardianResult.badge}
+                  </span>
+                </div>
+                {qrGuardianResult.matched_title && (
+                  <p className="text-[11px] text-slate-300">
+                    Official Target: <strong>{qrGuardianResult.matched_title}</strong> ({qrGuardianResult.matched_department})
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
