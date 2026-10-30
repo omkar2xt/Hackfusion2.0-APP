@@ -6,7 +6,17 @@ import { validateEmail } from '../utils/helpers';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { signIn } = useAuthContext();
+  const { signIn, demoSignIn } = useAuthContext();
+
+  const handleDemoSignIn = async (role: 'student' | 'admin' = 'student') => {
+    setLoading(true);
+    try {
+      await demoSignIn(role);
+      navigate('/dashboard', { replace: true });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -142,6 +152,32 @@ export default function LoginPage() {
           {loading && <Loader2 className="h-5 w-5 animate-spin" />}
           {loading ? 'Signing In...' : 'Sign In'}
         </button>
+
+        {/* Quick Demo Access Divider */}
+        <div className="relative flex items-center justify-center py-1">
+          <div className="w-full border-t border-slate-700/60" />
+          <span className="absolute bg-[#0d1326] px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            or instant access
+          </span>
+        </div>
+
+        {/* 1-Click Demo Buttons */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleDemoSignIn('student')}
+            className="flex items-center justify-center py-2.5 px-3 rounded-xl bg-slate-800/80 border border-teal-500/30 hover:border-teal-500/60 text-teal-300 font-semibold text-xs transition"
+          >
+            Demo Student
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDemoSignIn('admin')}
+            className="flex items-center justify-center py-2.5 px-3 rounded-xl bg-slate-800/80 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-300 font-semibold text-xs transition"
+          >
+            Security Admin
+          </button>
+        </div>
 
         {/* Sign up link */}
         <p className="text-center text-sm text-slate-400">

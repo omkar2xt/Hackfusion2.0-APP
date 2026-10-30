@@ -1,8 +1,15 @@
 import { useNavigate } from 'react-router-dom';
-import { Shield } from 'lucide-react';
+import { Shield, ArrowRight, Sparkles } from 'lucide-react';
+import { useAuthContext } from '../contexts/AuthContext';
 
 export default function WelcomePage() {
   const navigate = useNavigate();
+  const { demoSignIn } = useAuthContext();
+
+  const handleInstantDemo = async () => {
+    await demoSignIn('student');
+    navigate('/dashboard');
+  };
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#0a0f1e] via-[#0d1326] to-[#111827]">
@@ -68,16 +75,27 @@ export default function WelcomePage() {
           onClick={() => navigate('/login')}
           className="w-full max-w-sm rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-teal-500/25 transition-all duration-200 hover:shadow-teal-500/40 hover:brightness-110 active:scale-[0.98]"
         >
-          Sign In
+          Sign In to Campus Account
+        </button>
+
+        {/* Instant Demo Access */}
+        <button
+          type="button"
+          onClick={handleInstantDemo}
+          className="mt-3 w-full max-w-sm rounded-xl border border-teal-500/40 bg-teal-500/10 px-6 py-3 text-sm font-semibold text-teal-300 shadow-md transition-all duration-200 hover:bg-teal-500/20 flex items-center justify-center gap-2 active:scale-[0.98]"
+        >
+          <Sparkles className="h-4 w-4 text-teal-400" />
+          <span>Launch Campus Dashboard (Instant Access)</span>
+          <ArrowRight className="h-4 w-4 text-teal-400" />
         </button>
 
         {/* Get Started link */}
         <button
           type="button"
           onClick={() => navigate('/signup')}
-          className="mt-4 text-sm font-medium text-teal-400 transition-colors hover:text-teal-300"
+          className="mt-4 text-sm font-medium text-slate-400 transition-colors hover:text-teal-300"
         >
-          Get Started →
+          Don't have an account? <span className="text-teal-400 font-semibold">Sign Up →</span>
         </button>
       </div>
 

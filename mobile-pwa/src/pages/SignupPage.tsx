@@ -47,7 +47,7 @@ function StrengthIndicator({ strength }: { strength: PasswordStrength }) {
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { signUp } = useAuthContext();
+  const { signUp, demoSignIn } = useAuthContext();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -247,6 +247,25 @@ export default function SignupPage() {
         >
           {loading && <Loader2 className="h-5 w-5 animate-spin" />}
           {loading ? 'Creating Account...' : 'Create Account'}
+        </button>
+
+        {/* Quick Demo Access Divider */}
+        <div className="relative flex items-center justify-center py-1">
+          <div className="w-full border-t border-slate-700/60" />
+          <span className="absolute bg-[#0d1326] px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            or instant access
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={async () => {
+            await demoSignIn('student');
+            navigate('/dashboard', { replace: true });
+          }}
+          className="w-full flex items-center justify-center py-2.5 px-3 rounded-xl bg-slate-800/80 border border-teal-500/30 hover:border-teal-500/60 text-teal-300 font-semibold text-xs transition"
+        >
+          Instant Campus Student Demo Access
         </button>
 
         {/* Sign in link */}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { GitFork, CheckCircle, AlertTriangle, ShieldCheck, Search, Building2, UserX } from 'lucide-react';
+import { CheckCircle, AlertTriangle, ShieldCheck, Search, Building2, UserX } from 'lucide-react';
+import Header from '../components/Header';
 import { api } from '../services/api';
 import type { InstitutionalIdentity, TrustVerificationResult } from '../types';
 
@@ -50,16 +51,13 @@ export const TrustGraphPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-20">
-      <div>
-        <div className="flex items-center gap-2">
-          <GitFork className="w-6 h-6 text-teal-400" />
-          <h1 className="text-2xl font-bold text-slate-100">Institutional Trust Graph</h1>
-        </div>
-        <p className="text-xs text-slate-400 mt-1">
-          Cryptographically map & verify official campus authorities vs lookalike impersonation
-        </p>
-      </div>
+    <div className="min-h-screen bg-[#0a0f1e] text-slate-100 pb-24">
+      <Header
+        title="Institutional Trust Graph"
+        subtitle="Cryptographic sender & authority verification"
+        showBack
+      />
+      <div className="max-w-lg mx-auto px-4 pt-4 space-y-5">
 
       {/* Sender Verifier */}
       <form onSubmit={handleVerifySender} className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
@@ -197,6 +195,8 @@ export const TrustGraphPage: React.FC = () => {
           </div>
         )}
       </div>
+      </div>
     </div>
   );
 };
+

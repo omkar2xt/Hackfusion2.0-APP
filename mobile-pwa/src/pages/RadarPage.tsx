@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Shield, AlertTriangle, TrendingUp, BarChart2, Radio, CheckCircle, Info, RefreshCw } from 'lucide-react';
+import Header from '../components/Header';
 import { api } from '../services/api';
 import type { CyberRadarOverview, ExposureIntelligence, CampusWarning } from '../types';
 
@@ -47,25 +48,28 @@ export const RadarPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-20">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="min-h-screen bg-[#0a0f1e] text-slate-100 pb-24">
+      <Header
+        title="Campus Cyber Radar"
+        subtitle="Real-time campus threat posture"
+        showBack
+      />
+      <div className="max-w-lg mx-auto px-4 pt-4 space-y-5">
+        {/* Sub Header & Refresh */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Radio className="w-6 h-6 text-teal-400 animate-pulse" />
-            <h1 className="text-2xl font-bold text-slate-100">Campus Cyber Radar</h1>
+            <Radio className="w-5 h-5 text-teal-400 animate-pulse" />
+            <span className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Live Threat Intel</span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Real-time threat intelligence & exposure analytics across campus</p>
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="p-2 rounded-xl bg-slate-800/80 border border-slate-700 hover:border-teal-500/50 text-slate-300 hover:text-teal-400 transition"
+            title="Refresh Radar"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
-        <button
-          onClick={fetchData}
-          disabled={loading}
-          className="p-2 rounded-xl bg-slate-800/80 border border-slate-700 hover:border-teal-500/50 text-slate-300 hover:text-teal-400 transition"
-          title="Refresh Radar"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
 
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center gap-3 text-red-400 text-sm">
@@ -231,6 +235,8 @@ export const RadarPage: React.FC = () => {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 };
+

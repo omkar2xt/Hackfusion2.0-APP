@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Dna, Search, AlertCircle, Layers, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Search, AlertCircle, Layers, CheckCircle2, ShieldAlert } from 'lucide-react';
+import Header from '../components/Header';
 import { api } from '../services/api';
 import type { ThreatFingerprint, ThreatCampaign } from '../types';
 
@@ -53,16 +54,13 @@ export const ThreatDnaPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-20">
-      <div>
-        <div className="flex items-center gap-2">
-          <Dna className="w-6 h-6 text-teal-400" />
-          <h1 className="text-2xl font-bold text-slate-100">Cyberattack DNA Engine</h1>
-        </div>
-        <p className="text-xs text-slate-400 mt-1">
-          Semantic threat fingerprinting & campaign correlation even when attackers rotate URLs or domains
-        </p>
-      </div>
+    <div className="min-h-screen bg-[#0a0f1e] text-slate-100 pb-24">
+      <Header
+        title="Cyberattack DNA Engine"
+        subtitle="Semantic threat campaign correlation"
+        showBack
+      />
+      <div className="max-w-lg mx-auto px-4 pt-4 space-y-5">
 
       {/* DNA Extractor Form */}
       <form onSubmit={handleAnalyzeDna} className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
@@ -245,6 +243,8 @@ export const ThreatDnaPage: React.FC = () => {
           </div>
         )}
       </div>
+      </div>
     </div>
   );
 };
+
