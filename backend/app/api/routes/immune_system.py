@@ -26,3 +26,4 @@ def create_campus_warning(
 ):
     """Publishes a campus-wide threat alert after administrative review."""
     return immune_system_service.create_warning(db, admin.id, payload)
+

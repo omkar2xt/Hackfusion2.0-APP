@@ -37,6 +37,28 @@ export interface ScanResult {
   input_value: string;
 }
 
+export interface ConnectedScanInfo {
+  scan_id?: string | null;
+  input_value: string;
+  verdict: string;
+  risk_level: string;
+  risk_score: number;
+  indicators: string[];
+  recommendations: string[];
+  checked_at?: string | null;
+}
+
+export interface IStepsInsights {
+  malicious_url_detected: boolean;
+  malicious_attachment_detected: boolean;
+  malicious_call_to_action_detected: boolean;
+  suspicious_headers_or_impersonation: boolean;
+  target_audience: string;
+  attack_vector: string;
+  analyst_assigned: string;
+  containment_status: string;
+}
+
 export interface Incident {
   id: string;
   user_id: string;
@@ -48,6 +70,8 @@ export interface Incident {
   created_at: string;
   updated_at: string;
   resolution_notes: string;
+  connected_scan?: ConnectedScanInfo;
+  isteps_insights?: IStepsInsights;
 }
 
 export interface DashboardStats {
@@ -121,18 +145,88 @@ export interface ThreatCampaign {
 }
 
 // Feature 2 & 3: Cyber Radar & Exposure Intelligence
+export interface CampusZoneTelemetry {
+  id: string;
+  name: string;
+  code: string;
+  category: string;
+  threat_level: 'RED_ALERT' | 'ELEVATED' | 'NORMAL';
+  active_threats: number;
+  reported_incidents_today: number;
+  radius_meters: number;
+  proximity_alert_active: boolean;
+  last_reported_attack: string;
+  top_threat_vector: string;
+  x_percent: number;
+  y_percent: number;
+}
+
+export interface ThreatFeedEvent {
+  id: string;
+  timestamp_display: string;
+  campus_zone: string;
+  category: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  threat_vector: string;
+  anonymized_reporter: string; // Zero PII: e.g. "Student #4A8F"
+  status: string;
+  distance_meters?: number;
+}
+
+export interface ProximityAlertBroadcast {
+  id: string;
+  zone_id: string;
+  zone_name: string;
+  severity: string;
+  alert_title: string;
+  alert_message: string;
+  created_at: string;
+  expires_in_minutes: number;
+  active: boolean;
+}
+
+export interface CategoryStat {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
+export interface SeverityStat {
+  severity: string;
+  count: number;
+  color: string;
+}
+
 export interface CyberRadarOverview {
   threat_level: 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
   total_threats: number;
-  scans_last_7_days: number;
-  incidents_last_7_days: number;
-  severity_distribution: Record<string, number>;
-  category_distribution: Record<string, number>;
-  trend_last_7_days: Array<{
+  total_incidents?: number;
+  live_attacks_count?: number;
+  critical_alerts_count?: number;
+  blocked_traffic_count?: number;
+  phishing_count?: number;
+  qr_threats_count?: number;
+  impersonation_count?: number;
+  payment_fraud_count?: number;
+  categories?: CategoryStat[];
+  severities?: SeverityStat[];
+  scans_last_7_days?: number;
+  incidents_last_7_days?: number;
+  severity_distribution?: Record<string, number>;
+  category_distribution?: Record<string, number>;
+  trends?: Array<{
+    date: string;
+    incidents: number;
+    scans: number;
+  }>;
+  trend_last_7_days?: Array<{
     date: string;
     scans: number;
     incidents: number;
   }>;
+  campus_zones?: CampusZoneTelemetry[];
+  realtime_threat_feed?: ThreatFeedEvent[];
+  active_proximity_alerts?: ProximityAlertBroadcast[];
 }
 
 export interface DepartmentExposurePattern {
@@ -223,9 +317,12 @@ export interface TimelineEvent {
   id: string;
   incident_id: string;
   event_type: string;
-  actor: string;
-  details: string;
-  timestamp: string;
+  actor?: string;
+  actor_id?: string;
+  details?: string;
+  description?: string;
+  timestamp?: string;
+  created_at?: string;
 }
 
 export interface EvidenceExportPackage {

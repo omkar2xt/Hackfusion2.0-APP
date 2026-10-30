@@ -24,7 +24,7 @@ class TimelineService:
             id=str(uuid.uuid4()),
             incident_id=incident_id,
             event_type=event_type,
-            actor_id=actor_id,
+            actor_id=actor_id or "SOC Analyst",
             description=description,
             metadata_json=metadata_json or {},
             created_at=datetime.utcnow()
@@ -42,18 +42,42 @@ class TimelineService:
             .order_by(IncidentTimelineModel.created_at.asc())
             .all()
         )
-        return [
-            IncidentTimelineEventResponse(
-                id=e.id,
-                incident_id=e.incident_id,
-                event_type=e.event_type,
-                actor_id=e.actor_id,
-                description=e.description,
-                metadata_json=e.metadata_json or {},
-                created_at=e.created_at.isoformat() + "Z" if e.created_at else ""
+        # If no events exist yet, seed initial CREATED event so timeline is never empty
+        if not events:
+            inc = db.query(IncidentModel).filter(IncidentModel.id == incident_id).first()
+            if inc:
+                init_ev = IncidentTimelineModel(
+                    id=str(uuid.uuid4()),
+                    incident_id=incident_id,
+                    event_type="CREATED",
+                    actor_id="Reporter Endpoint",
+                    description=f"Incident report submitted into triage queue under category '{inc.category}'.",
+                    metadata_json={"severity": inc.severity, "category": inc.category},
+                    created_at=inc.created_at or datetime.utcnow()
+                )
+                db.add(init_ev)
+                db.commit()
+                db.refresh(init_ev)
+                events = [init_ev]
+
+        results = []
+        for e in events:
+            iso_time = e.created_at.isoformat() + "Z" if e.created_at else datetime.utcnow().isoformat() + "Z"
+            results.append(
+                IncidentTimelineEventResponse(
+                    id=e.id,
+                    incident_id=e.incident_id,
+                    event_type=e.event_type,
+                    actor_id=e.actor_id or "SOC Analyst",
+                    actor=e.actor_id or "Campus SOC",
+                    description=e.description,
+                    details=e.description,
+                    metadata_json=e.metadata_json or {},
+                    created_at=iso_time,
+                    timestamp=iso_time
+                )
             )
-            for e in events
-        ]
+        return results
 
     @classmethod
     def export_evidence_package(cls, db: Session, incident_id: str) -> Optional[IncidentTimelineExportResponse]:
@@ -74,7 +98,7 @@ class TimelineService:
             category=incident.category,
             severity=incident.severity,
             current_status=incident.status,
-            created_at=incident.created_at.isoformat() + "Z" if incident.created_at else "",
+            created_at=incident.created_at.isoformat() + "Z" if incident.created_at else datetime.utcnow().isoformat() + "Z",
             exported_at=datetime.utcnow().isoformat() + "Z",
             total_events=len(timeline_events),
             timeline=timeline_events,

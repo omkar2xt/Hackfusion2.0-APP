@@ -43,3 +43,4 @@ class VerifyIdentityResponse(BaseModel):
     indicators: List[str]
     explanation: str
     safety_guidance: str
+

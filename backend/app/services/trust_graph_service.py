@@ -243,3 +243,4 @@ class TrustGraphService:
 
 
 trust_graph_service = TrustGraphService()
+

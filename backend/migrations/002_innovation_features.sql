@@ -150,3 +150,4 @@ CREATE POLICY "Users read own learning progress" ON public.learning_progress FOR
 CREATE INDEX IF NOT EXISTS idx_threat_fingerprints_hash ON public.threat_fingerprints(fingerprint_hash);
 CREATE INDEX IF NOT EXISTS idx_threat_campaigns_status ON public.threat_campaigns(status);
 CREATE INDEX IF NOT EXISTS idx_incident_timeline_inc ON public.incident_timeline(incident_id);
+

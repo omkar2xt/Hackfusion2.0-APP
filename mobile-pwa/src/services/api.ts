@@ -142,6 +142,22 @@ class ApiService {
     });
   }
 
+  async updateIncidentStatus(
+    id: string,
+    data: { status?: string; severity?: string; resolution_notes?: string }
+  ): Promise<Incident> {
+    return this.request<Incident>(`/api/v1/incidents/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async quarantineIncident(id: string): Promise<{ status: string; message: string }> {
+    return this.request<{ status: string; message: string }>(`/api/v1/incidents/${encodeURIComponent(id)}/actions/quarantine`, {
+      method: 'POST',
+    });
+  }
+
   // --- Dashboard & Profile ---
   async getDashboardStats(): Promise<DashboardStats> {
     return this.request<DashboardStats>('/api/v1/dashboard/stats', {
@@ -192,6 +208,24 @@ class ApiService {
   async getExposureIntelligence(): Promise<ExposureIntelligence> {
     return this.request<ExposureIntelligence>('/api/v1/cyber-radar/exposure', {
       method: 'GET',
+    });
+  }
+
+  async getProximityAlerts(): Promise<any[]> {
+    return this.request<any[]>('/api/v1/cyber-radar/proximity-alerts', {
+      method: 'GET',
+    });
+  }
+
+  async broadcastProximityAlert(data: {
+    zone_id: string;
+    category: string;
+    severity?: string;
+    message: string;
+  }): Promise<any> {
+    return this.request<any>('/api/v1/cyber-radar/broadcast-alert', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

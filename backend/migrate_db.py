@@ -13,3 +13,4 @@ if "department" not in cols:
 
 conn.close()
 print("Migration completed successfully.")
+

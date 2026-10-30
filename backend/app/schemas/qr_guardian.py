@@ -30,3 +30,4 @@ class QrGuardianAnalysisResponse(BaseModel):
     verification_badge: str  # "VERIFIED_OFFICIAL", "UNVERIFIED_CAMPUS", "SUSPICIOUS_MISMATCH", "EXTERNAL_DESTINATION"
     scan_result: ScanResultResponse
     safety_advisory: str
+

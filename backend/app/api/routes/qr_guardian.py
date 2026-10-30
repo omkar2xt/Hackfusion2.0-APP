@@ -53,3 +53,4 @@ def delete_verified_destination(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Verified QR entry not found")
     return {"status": "success", "message": "Verified QR entry deactivated"}
+

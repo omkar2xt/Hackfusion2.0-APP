@@ -52,3 +52,4 @@ def get_user_progress(
 ):
     """Returns user's security level badge, completed modules, and adaptive recommendations."""
     return safety_coach_service.get_user_progress(db, user.id)
+

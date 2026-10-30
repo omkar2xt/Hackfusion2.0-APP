@@ -309,3 +309,4 @@ class SafetyCoachService:
 
 
 safety_coach_service = SafetyCoachService()
+

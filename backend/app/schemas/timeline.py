@@ -6,10 +6,13 @@ class IncidentTimelineEventResponse(BaseModel):
     id: str
     incident_id: str
     event_type: str
-    actor_id: Optional[str] = None
+    actor_id: Optional[str] = "SOC Analyst"
+    actor: Optional[str] = "Campus SOC"
     description: str
-    metadata_json: Dict[str, Any]
+    details: Optional[str] = ""
+    metadata_json: Dict[str, Any] = {}
     created_at: str
+    timestamp: Optional[str] = ""
 
     model_config = {"from_attributes": True}
 

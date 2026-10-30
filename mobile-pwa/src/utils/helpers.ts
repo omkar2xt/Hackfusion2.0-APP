@@ -60,8 +60,13 @@ export function getStatusLabel(status: string): string {
   }
 }
 
-export function formatDate(date: string): string {
-  const d = new Date(date);
+export function formatDate(date?: string | null): string {
+  if (!date) return 'Recently';
+  // Normalize string: e.g. "2026-10-30 16:30:00" -> "2026-10-30T16:30:00"
+  const cleanDate = typeof date === 'string' ? date.replace(' ', 'T') : date;
+  const d = new Date(cleanDate);
+  if (isNaN(d.getTime())) return 'Recently';
+
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMins = Math.floor(diffMs / 60000);

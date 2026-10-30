@@ -187,3 +187,4 @@ class QrGuardianService:
 
 
 qr_guardian_service = QrGuardianService()
+

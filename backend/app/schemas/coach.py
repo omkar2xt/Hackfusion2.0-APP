@@ -49,3 +49,4 @@ class UserLearningProgressResponse(BaseModel):
     coach_level: str  # "Cyber Novice", "Security Apprentice", "Campus Shield Guardian"
     completed_module_ids: List[str]
     recommended_modules: List[LearningModuleResponse]
+

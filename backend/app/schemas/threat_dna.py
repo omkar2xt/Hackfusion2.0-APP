@@ -51,3 +51,4 @@ class AnalyzeThreatDnaRequest(BaseModel):
 class ReviewCampaignRequest(BaseModel):
     status: str = Field(..., description="'confirmed', 'rejected', 'mitigated'")
     notes: Optional[str] = None
+

@@ -44,3 +44,4 @@ def create_identity(
 ):
     """Registers an official campus official, department, or verified payment destination."""
     return trust_graph_service.create_identity(db, payload)
+

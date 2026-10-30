@@ -20,3 +20,4 @@ class CreateCampusWarningRequest(BaseModel):
     content: str = Field(..., min_length=10)
     severity: str = "high"
     status: str = "approved"
+
