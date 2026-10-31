@@ -1,0 +1,41 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidSize() {
+      return request.resource.size < 15 * 1024 * 1024; // 15 MB limit
+    }
+
+    function isAllowedMimeType() {
+      return request.resource.contentType.matches('image/.*') ||
+             request.resource.contentType == 'application/pdf' ||
+             request.resource.contentType == 'text/plain' ||
+             request.resource.contentType == 'application/octet-stream';
+    }
+
+    // User profile avatars
+    match /avatars/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && isValidSize() && request.resource.contentType.matches('image/.*');
+    }
+
+    // Incident forensic evidence vault
+    match /evidence/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && isValidSize() && isAllowedMimeType();
+    }
+
+    // Default deny all
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

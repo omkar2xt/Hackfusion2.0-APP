@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.role == 'Super Admin' || 
+         request.auth.token.role == 'Security Director' || 
+         request.auth.token.role == 'Lead Incident Commander');
+    }
+
+    // User profile isolation
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Incidents collection
+    match /incidents/{incidentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.reporter_id == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Threat intelligence & IOC database
+    match /threat_intelligence/{threatId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Emergency Red Alert broadcasts
+    match /red_alerts/{alertId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Campus mesh beacon nodes
+    match /campus_beacons/{beaconId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Evidence records
+    match /evidence_vault/{evidenceId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Strict default fallback: Deny all unauthenticated or unmatched access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

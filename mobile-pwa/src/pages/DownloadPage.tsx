@@ -24,7 +24,7 @@ export default function DownloadPage() {
     fileSize: '11.1 MB',
     minAndroid: 'Android 7.0 (Nougat, API 24) or higher',
     targetAndroid: 'Android 15 / 16 (API 36)',
-    sha256: '3d8f587d4e736f5d93501bac7a4b276b0c16f7eadaa57cd783a44bd648a617f9',
+    sha256: '839e7f80a1b39ad115dc2138c7d8b18d77cf0c998ba257849a1089438275c8ca',
     packageName: 'com.yodhra.app',
   });
 

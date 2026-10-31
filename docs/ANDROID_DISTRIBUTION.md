@@ -33,21 +33,21 @@ The official production release APK is signed with a dedicated RSA-2048 key usin
 
 | Package Type | File Name | Size | SHA-256 Checksum | Serving Endpoint |
 |---|---|---|---|---|
-| **Signed Production Release** | `YODHRA.apk` | 11.09 MB (11,629,683 bytes) | `3d8f587d4e736f5d93501bac7a4b276b0c16f7eadaa57cd783a44bd648a617f9` | `/downloads/YODHRA.apk` |
-| **Debug / Developer Build** | `YODHRA-debug.apk` | 14.98 MB (15,710,203 bytes) | `82e7c6677b559f9cd0732f25bba49627252e69a1840f0ecbbedbc20f585fa89f` | `/downloads/YODHRA-debug.apk` |
+| **Signed Production Release** | `YODHRA.apk` | 11.09 MB (11,629,727 bytes) | `839e7f80a1b39ad115dc2138c7d8b18d77cf0c998ba257849a1089438275c8ca` | `/downloads/YODHRA.apk` |
+| **Debug / Developer Build** | `YODHRA-debug.apk` | 13.62 MB (14,282,756 bytes) | `9dee3c8576507c3df87b13b7d580a19376e54d6b60188c69b62dee3edfc935d8` | `/downloads/YODHRA-debug.apk` |
 
 ### Integrity Verification (Windows PowerShell)
 ```powershell
 Get-FileHash -Algorithm SHA256 backend/app/static/downloads/YODHRA.apk
 # Output must match:
-# 3D8F587D4E736F5D93501BAC7A4B276B0C16F7EADAA57CD783A44BD648A617F9
+# 839E7F80A1B39AD115DC2138C7D8B18D77CF0C998BA257849A1089438275C8CA
 ```
 
 ### Integrity Verification (Linux / macOS)
 ```bash
 sha256sum backend/app/static/downloads/YODHRA.apk
 # Output:
-# 3d8f587d4e736f5d93501bac7a4b276b0c16f7eadaa57cd783a44bd648a617f9  YODHRA.apk
+# 839e7f80a1b39ad115dc2138c7d8b18d77cf0c998ba257849a1089438275c8ca  YODHRA.apk
 ```
 
 ---
