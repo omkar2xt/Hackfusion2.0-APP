@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import urllib.parse
 from typing import Generator, Tuple
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url, URL
@@ -19,6 +20,24 @@ def _mask_url(url_str: str) -> str:
     except Exception:
         # Fallback regex masking if URL cannot be parsed
         return re.sub(r':([^@/\s]+)@', ':****@', url_str)
+
+
+def _safe_encode_url(url_str: str) -> str:
+    """
+    Safely encodes password characters (e.g. '@', ':', '#') which otherwise break
+    standard RFC-1738 URL parsing in SQLAlchemy make_url().
+    """
+    if "://" not in url_str:
+        return url_str
+    scheme, rest = url_str.split("://", 1)
+    if "@" in rest:
+        userinfo, host_part = rest.rsplit("@", 1)
+        if ":" in userinfo:
+            user, pwd = userinfo.split(":", 1)
+            # Unquote first to prevent double-encoding, then safely quote
+            encoded_pwd = urllib.parse.quote(urllib.parse.unquote(pwd), safe="")
+            return f"{scheme}://{user}:{encoded_pwd}@{host_part}"
+    return url_str
 
 
 def resolve_database_url() -> Tuple[str, str]:
@@ -62,6 +81,9 @@ def build_engine():
     elif normalized_url.startswith("sqlite+aiosqlite:"):
         normalized_url = "sqlite:" + normalized_url[len("sqlite+aiosqlite:"):]
 
+    # Safely encode credentials so special characters in passwords don't fail regex
+    normalized_url = _safe_encode_url(normalized_url)
+
     # Validate that SQLAlchemy can parse the URL
     try:
         parsed_url = make_url(normalized_url)
@@ -99,6 +121,10 @@ def build_engine():
         engine_kwargs["pool_size"] = 10
         engine_kwargs["max_overflow"] = 20
 
+        # Auto-enforce SSL for remote cloud databases if not explicitly specified
+        if "sslmode" not in parsed_url.query and not parsed_url.host.startswith(("127.0.0.1", "localhost")):
+            engine_kwargs.setdefault("connect_args", {})["sslmode"] = "require"
+
     masked_target = parsed_url.render_as_string(hide_password=True)
     print(f"[{settings.PROJECT_NAME}] Database engine initialized using '{source_var}' -> {masked_target}")
 
@@ -117,7 +143,17 @@ SessionLocal = sessionmaker(
 
 def init_db() -> None:
     """Creates database tables synchronously on startup if they don't exist."""
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+        print(f"[{settings.PROJECT_NAME}] Database schema verified and initialized.")
+    except Exception as exc:
+        masked = _mask_url(str(engine.url))
+        print(f"[{settings.PROJECT_NAME}] [DATABASE WARNING] Could not verify schema on {masked}: {exc}", file=sys.stderr)
+        print(
+            f"[{settings.PROJECT_NAME}] [DATABASE RESILIENCE] Server will proceed with startup. "
+            "Database connections will automatically reconnect upon client request.",
+            file=sys.stderr
+        )
 
 
 def get_db() -> Generator[Session, None, None]:
