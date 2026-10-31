@@ -4,6 +4,10 @@ __pycache__/
 *$py.class
 *.so
 .Python
+# Environment files
+.env
+.env.*
+*.env
 env/
 venv/
 .venv/
@@ -31,3 +35,4 @@ local.properties
 Thumbs.db
 .vscode/
 .idea/
+
