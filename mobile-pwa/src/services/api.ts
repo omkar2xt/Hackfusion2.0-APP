@@ -43,8 +43,14 @@ import type {
   AuditLog,
 } from '../types';
 
+export const DEFAULT_PRODUCTION_RENDER_URL = 'https://hackfusion2-0-app.onrender.com';
+
+export type NetworkStatus = 'online' | 'offline' | 'connecting';
+
 class ApiService {
   private baseUrl: string;
+  private statusListeners: Set<(status: NetworkStatus) => void> = new Set();
+  private currentStatus: NetworkStatus = 'online';
 
   constructor() {
     const customEndpoint =
@@ -52,15 +58,18 @@ class ApiService {
     const envBase = import.meta.env.VITE_API_BASE_URL;
 
     if (customEndpoint && customEndpoint.trim() !== '') {
-      this.baseUrl = customEndpoint.replace(/\/+$/, '');
-    } else if (envBase !== undefined && envBase !== '') {
-      this.baseUrl = envBase.replace(/\/+$/, '');
+      this.baseUrl = customEndpoint.trim().replace(/\/+$/, '');
+    } else if (envBase !== undefined && envBase.trim() !== '') {
+      this.baseUrl = envBase.trim().replace(/\/+$/, '');
     } else if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.()) {
       // Native Android APK: default to cloud production endpoint (overridable in app settings)
-      this.baseUrl = 'https://api.yodhra.klsvdit.edu.in';
+      this.baseUrl = DEFAULT_PRODUCTION_RENDER_URL;
+    } else if (import.meta.env.DEV) {
+      // Local dev mode: Vite proxy routes '' to http://127.0.0.1:8000
+      this.baseUrl = '';
     } else {
-      // Web PWA: In dev mode Vite proxy routes ''; in prod uses same origin
-      this.baseUrl = import.meta.env.DEV ? '' : (typeof window !== 'undefined' ? window.location.origin : '');
+      // Production Web (Vercel): default to deployed Render backend
+      this.baseUrl = DEFAULT_PRODUCTION_RENDER_URL;
     }
   }
 
@@ -69,9 +78,39 @@ class ApiService {
   }
 
   public setBaseUrl(url: string): void {
-    this.baseUrl = url.replace(/\/+$/, '');
+    this.baseUrl = url.trim().replace(/\/+$/, '');
     if (typeof window !== 'undefined') {
       localStorage.setItem('yodhra_custom_api_url', this.baseUrl);
+    }
+  }
+
+  public onStatusChange(callback: (status: NetworkStatus) => void): () => void {
+    this.statusListeners.add(callback);
+    callback(this.currentStatus);
+    return () => {
+      this.statusListeners.delete(callback);
+    };
+  }
+
+  private setStatus(status: NetworkStatus): void {
+    if (this.currentStatus !== status) {
+      this.currentStatus = status;
+      this.statusListeners.forEach((listener) => listener(status));
+    }
+  }
+
+  public async checkHealth(): Promise<boolean> {
+    try {
+      this.setStatus('connecting');
+      const res = await this.request<{ status: string }>('/api/v1/health', {
+        method: 'GET',
+      });
+      const ok = res && (res.status === 'healthy' || res.status === 'degraded');
+      this.setStatus(ok ? 'online' : 'offline');
+      return ok;
+    } catch {
+      this.setStatus('offline');
+      return false;
     }
   }
 
@@ -83,22 +122,45 @@ class ApiService {
   }
 
   private getToken(): string | null {
+    if (typeof window === 'undefined') return null;
+
+    // 1. Direct token storage key
     const raw = localStorage.getItem('sb-auth-token');
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed.access_token || null;
-    } catch {
-      return raw;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.access_token) return parsed.access_token;
+      } catch {
+        return raw;
+      }
     }
+
+    // 2. Standard Supabase SDK project token: sb-<project-ref>-auth-token
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const item = localStorage.getItem(key);
+        if (item) {
+          try {
+            const parsed = JSON.parse(item);
+            if (parsed.access_token) return parsed.access_token;
+          } catch {
+            // continue
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const token = this.getToken();
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...(options.headers as Record<string, string>),
     };
 
@@ -106,8 +168,10 @@ class ApiService {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    // Render cloud cold starts can take 20-35s. Timeout set to 35s.
+    const REQUEST_TIMEOUT_MS = 35000;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     let response: Response;
     try {
@@ -116,18 +180,45 @@ class ApiService {
         headers,
         signal: options.signal || controller.signal,
       });
+      this.setStatus('online');
     } catch (networkError: any) {
       clearTimeout(timeoutId);
+
+      // Handle retry for idempotent GET requests during cold-start or momentary glitch
+      const isGet = !options.method || options.method.toUpperCase() === 'GET';
+      if (isGet && retryCount < 1) {
+        this.setStatus('connecting');
+        await new Promise((res) => setTimeout(res, 2000));
+        return this.request<T>(endpoint, options, retryCount + 1);
+      }
+
+      this.setStatus('offline');
       if (networkError.name === 'AbortError') {
-        const error = new Error(`Request to ${endpoint} timed out after 10s`) as Error & { statusCode: number };
+        const error = new Error(
+          `Request to ${endpoint} timed out after ${REQUEST_TIMEOUT_MS / 1000}s. The backend server (Render) may be waking up from sleep. Please try again.`
+        ) as Error & { statusCode: number };
         error.statusCode = 408;
         throw error;
       }
-      const error = new Error(`Cannot connect to backend server at ${this.baseUrl}. Please ensure the FastAPI server is running.`) as Error & { statusCode: number };
+      const displayUrl = this.baseUrl || 'local dev proxy';
+      const error = new Error(
+        `Cannot connect to backend server at ${displayUrl}. Please ensure the Render service is running.`
+      ) as Error & { statusCode: number };
       error.statusCode = 503;
       throw error;
     } finally {
       clearTimeout(timeoutId);
+    }
+
+    // If server responded with 502/503 during cold-start warmup, retry idempotent GET once
+    if (
+      (response.status === 502 || response.status === 503) &&
+      retryCount < 1 &&
+      (!options.method || options.method.toUpperCase() === 'GET')
+    ) {
+      this.setStatus('connecting');
+      await new Promise((res) => setTimeout(res, 3000));
+      return this.request<T>(endpoint, options, retryCount + 1);
     }
 
     if (!response.ok) {
@@ -138,6 +229,11 @@ class ApiService {
       } catch {
         errorDetail = `Request failed with status ${response.status}: ${response.statusText}`;
       }
+
+      if (response.status === 401 && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('yodhra:auth:unauthorized'));
+      }
+
       const error = new Error(errorDetail) as Error & { statusCode: number };
       error.statusCode = response.status;
       throw error;

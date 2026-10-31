@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -18,6 +18,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import Logo from './Logo';
+import { api, type NetworkStatus } from '../services/api';
 
 interface HeaderProps {
   title?: string;
@@ -29,6 +30,20 @@ export default function Header({ title, subtitle, showBack = false }: HeaderProp
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [networkStatus, setNetworkStatus] = useState<NetworkStatus>('online');
+
+  useEffect(() => {
+    const unsubscribe = api.onStatusChange(setNetworkStatus);
+    const handleOnline = () => setNetworkStatus('online');
+    const handleOffline = () => setNetworkStatus('offline');
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, desc: 'Central security posture' },
@@ -95,8 +110,43 @@ export default function Header({ title, subtitle, showBack = false }: HeaderProp
             })}
           </nav>
 
-          {/* Right Action Icons: Red Alert Radar Shortcut + Mobile Hamburger */}
+          {/* Right Action Icons: Cloud Status + Red Alert Radar Shortcut + Mobile Hamburger */}
           <div className="flex items-center gap-2">
+            {/* Real-time Cloud Connection Status Badge */}
+            <div
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition ${
+                networkStatus === 'online'
+                  ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/25'
+                  : networkStatus === 'connecting'
+                  ? 'bg-amber-500/10 text-amber-700 border-amber-500/25'
+                  : 'bg-rose-500/10 text-rose-700 border-rose-500/25'
+              }`}
+              title={
+                networkStatus === 'online'
+                  ? 'Connected to Render Cloud Backend'
+                  : networkStatus === 'connecting'
+                  ? 'Connecting to Render Cloud (Waking up)...'
+                  : 'Offline Mode Active'
+              }
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  networkStatus === 'online'
+                    ? 'bg-emerald-500 animate-pulse'
+                    : networkStatus === 'connecting'
+                    ? 'bg-amber-500 animate-ping'
+                    : 'bg-rose-500'
+                }`}
+              />
+              <span className="hidden md:inline">
+                {networkStatus === 'online'
+                  ? 'Render Live'
+                  : networkStatus === 'connecting'
+                  ? 'Connecting...'
+                  : 'Offline'}
+              </span>
+            </div>
+
             {/* APK Download Button */}
             <button
               onClick={() => navigate('/download')}
@@ -156,9 +206,31 @@ export default function Header({ title, subtitle, showBack = false }: HeaderProp
                   </span>
                 </div>
                 <p className="text-[10px] text-[#64748B] font-mono truncate">Main University Campus</p>
-                <div className="flex items-center gap-1 text-[10px] text-[#27845A] mt-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#27845A] animate-ping" />
-                  <span>Authenticated Device Relay Active</span>
+                <div className="flex items-center gap-1.5 text-[10px] mt-1">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      networkStatus === 'online'
+                        ? 'bg-[#27845A] animate-pulse'
+                        : networkStatus === 'connecting'
+                        ? 'bg-[#E5933A] animate-ping'
+                        : 'bg-[#C74747]'
+                    }`}
+                  />
+                  <span
+                    className={
+                      networkStatus === 'online'
+                        ? 'text-[#27845A] font-semibold'
+                        : networkStatus === 'connecting'
+                        ? 'text-[#E5933A] font-semibold'
+                        : 'text-[#C74747] font-semibold'
+                    }
+                  >
+                    {networkStatus === 'online'
+                      ? 'Render Cloud: Live'
+                      : networkStatus === 'connecting'
+                      ? 'Render Cloud: Warming Up...'
+                      : 'Render Cloud: Offline'}
+                  </span>
                 </div>
               </div>
             </div>
