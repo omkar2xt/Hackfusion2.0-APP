@@ -193,3 +193,4 @@ GET /api/v1/health
    - Render automatically triggers the build via GitHub webhook.
 2. **Rollback:**
    - In Render Dashboard -> **Deploys** -> select any prior successful deploy and click **Rollback**.
+

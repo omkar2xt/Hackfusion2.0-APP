@@ -88,3 +88,4 @@ def test_valid_postgresql_url_normalization(monkeypatch):
     parsed = make_url(resolved)
     assert parsed.drivername == "postgresql+psycopg"
     assert parsed.host == "aws-1-eu-west-3.pooler.supabase.com"
+
