@@ -1,23 +1,112 @@
-from typing import Generator
+import os
+import re
+import sys
+from typing import Generator, Tuple
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url, URL
 from sqlalchemy.orm import sessionmaker, Session
 from app.core.config import settings
 from app.database.models import Base
 
-db_url = settings.DATABASE_URL
-if db_url.startswith("sqlite+aiosqlite:"):
-    db_url = db_url.replace("sqlite+aiosqlite:", "sqlite:", 1)
 
-connect_args = {}
-if db_url.startswith("sqlite"):
-    connect_args = {"check_same_thread": False}
+def _mask_url(url_str: str) -> str:
+    """Masks database passwords for safe error reporting and logging without exposing credentials."""
+    if not url_str:
+        return "<empty>"
+    try:
+        parsed = make_url(url_str)
+        return parsed.render_as_string(hide_password=True)
+    except Exception:
+        # Fallback regex masking if URL cannot be parsed
+        return re.sub(r':([^@/\s]+)@', ':****@', url_str)
 
-# Standard synchronous SQLAlchemy engine
-engine = create_engine(
-    db_url,
-    echo=False,
-    connect_args=connect_args
-)
+
+def resolve_database_url() -> Tuple[str, str]:
+    """
+    Safely resolves, normalizes, and validates the database connection URL.
+    Checks in order:
+      1. settings.DATABASE_URL
+      2. settings.SUPABASE_DATABASE_URL
+      3. settings.INTERNAL_DATABASE_URL
+      4. settings.POSTGRES_URL
+      5. Fallback to local SQLite signalsafe.db
+    Returns: (cleaned_url, source_variable_name)
+    """
+    candidates = [
+        ("DATABASE_URL", settings.DATABASE_URL),
+        ("SUPABASE_DATABASE_URL", settings.SUPABASE_DATABASE_URL),
+        ("INTERNAL_DATABASE_URL", settings.INTERNAL_DATABASE_URL),
+        ("POSTGRES_URL", settings.POSTGRES_URL),
+    ]
+
+    for var_name, candidate in candidates:
+        if not candidate:
+            continue
+        # Strip surrounding whitespace and any accidental wrapping quotes (single or double)
+        cleaned = candidate.strip().strip("'\"").strip()
+        if cleaned and cleaned.lower() not in ("none", "null", "undefined"):
+            return cleaned, var_name
+
+    # If no candidate was provided, return local SQLite default
+    return settings.default_sqlite_url, "default_sqlite_fallback"
+
+
+def build_engine():
+    raw_url, source_var = resolve_database_url()
+
+    # Normalize driver / scheme prefixes
+    normalized_url = raw_url
+    if normalized_url.startswith("postgres://"):
+        # Supabase and Render legacy prefix: convert postgres:// -> postgresql://
+        normalized_url = "postgresql://" + normalized_url[len("postgres://"):]
+    elif normalized_url.startswith("sqlite+aiosqlite:"):
+        normalized_url = "sqlite:" + normalized_url[len("sqlite+aiosqlite:"):]
+
+    # Validate that SQLAlchemy can parse the URL
+    try:
+        parsed_url = make_url(normalized_url)
+    except Exception as parse_err:
+        masked = _mask_url(raw_url)
+        print(f"[ERROR] Could not parse database URL from '{source_var}': {masked}", file=sys.stderr)
+        print(
+            "[CONFIG ADVISORY] Expected format: postgresql://[user]:[password]@[host]:[port]/[database] "
+            "or sqlite:///path/to/db. Ensure there are no surrounding quotes or whitespace in Render environment variables.",
+            file=sys.stderr
+        )
+        if getattr(settings, "ENVIRONMENT", "").lower() == "production":
+            raise ValueError(
+                f"Could not parse database URL from environment variable '{source_var}'. "
+                f"Value given: '{masked}'. Please check your Render environment configuration."
+            ) from parse_err
+        else:
+            print("[FALLBACK] Reverting to local SQLite database in development mode...", file=sys.stderr)
+            normalized_url = settings.default_sqlite_url
+            parsed_url = make_url(normalized_url)
+            source_var = "default_sqlite_fallback"
+
+    # Engine connection arguments & pool tuning
+    engine_kwargs = {
+        "echo": False,
+        "pool_pre_ping": True,  # Checks connection liveness before reuse (critical for Supabase poolers)
+    }
+
+    if parsed_url.drivername.startswith("sqlite"):
+        engine_kwargs["connect_args"] = {"check_same_thread": False}
+    elif parsed_url.drivername.startswith("postgresql"):
+        # Supabase Session/Transaction poolers and Render PostgreSQL
+        # Pool recycle prevents connection drops on cloud serverless infrastructure
+        engine_kwargs["pool_recycle"] = 300
+        engine_kwargs["pool_size"] = 10
+        engine_kwargs["max_overflow"] = 20
+
+    masked_target = parsed_url.render_as_string(hide_password=True)
+    print(f"[{settings.PROJECT_NAME}] Database engine initialized using '{source_var}' -> {masked_target}")
+
+    return create_engine(normalized_url, **engine_kwargs)
+
+
+# Initialize SQLAlchemy engine with safe URL parsing and validation
+engine = build_engine()
 
 SessionLocal = sessionmaker(
     autocommit=False,

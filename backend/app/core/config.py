@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,10 +16,18 @@ class Settings(BaseSettings):
         "http://10.10.9.33:5173,http://192.168.56.1:5173"
     )
 
-    # Database configuration - resolve absolute path to backend/signalsafe.db
-    _backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    _default_db_path = os.path.join(_backend_dir, "signalsafe.db").replace("\\", "/")
-    DATABASE_URL: str = f"sqlite:///{_default_db_path}"
+    # Database configuration
+    # Can be set via environment variable: DATABASE_URL, SUPABASE_DATABASE_URL, or INTERNAL_DATABASE_URL
+    DATABASE_URL: Optional[str] = None
+    SUPABASE_DATABASE_URL: Optional[str] = None
+    INTERNAL_DATABASE_URL: Optional[str] = None
+    POSTGRES_URL: Optional[str] = None
+
+    @property
+    def default_sqlite_url(self) -> str:
+        _backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        _default_db_path = os.path.join(_backend_dir, "signalsafe.db").replace("\\", "/")
+        return f"sqlite:///{_default_db_path}"
 
     # Supabase optional integration
     SUPABASE_URL: str = ""
