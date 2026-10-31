@@ -21,10 +21,10 @@ export default function DownloadPage() {
     version: '1.0.0',
     versionCode: 1,
     releaseDate: 'October 31, 2026',
-    fileSize: '8.4 MB',
+    fileSize: '11.1 MB',
     minAndroid: 'Android 7.0 (Nougat, API 24) or higher',
     targetAndroid: 'Android 15 / 16 (API 36)',
-    sha256: 'bd6e8230e1850935124257709394e46c4a98c3ede59f726e4dde670878125cd6',
+    sha256: '3d8f587d4e736f5d93501bac7a4b276b0c16f7eadaa57cd783a44bd648a617f9',
     packageName: 'com.yodhra.app',
   });
 
