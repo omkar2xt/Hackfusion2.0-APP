@@ -49,7 +49,7 @@ def get_latest_version():
 
     return AppVersionResponse(
         app_name="YODHRA – Cyber Intelligence",
-        package_name="in.edu.klsvdit.yodhra",
+        package_name="com.yodhra.app",
         latest_version="1.0.0",
         version_code=1,
         release_date="2026-10-31",

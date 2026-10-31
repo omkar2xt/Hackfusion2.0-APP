@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'in.edu.klsvdit.yodhra',
+  appId: 'com.yodhra.app',
   appName: 'YODHRA – Cyber Intelligence',
   webDir: 'dist',
   server: {

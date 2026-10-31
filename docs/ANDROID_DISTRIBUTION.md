@@ -4,13 +4,14 @@
 YODHRA Cyber Intelligence is packaged as a high-performance standalone Android application via Capacitor 8 integration over the React + Vite + TypeScript PWA core. It is built for **direct APK distribution** without publishing to the Google Play Store, allowing campus users, security operators, and faculty to download and install the official signed APK directly from the institution's web portal.
 
 ### Application Identity
-- **Application ID / Package Name**: `in.edu.klsvdit.yodhra`
+- **Application ID / Package Name**: `com.yodhra.app`
 - **Application Name**: `YODHRA – Cyber Intelligence`
 - **Version**: `1.0.0`
 - **Version Code**: `1`
 - **Min Android SDK**: API Level 24 (Android 7.0 Nougat)
 - **Target Android SDK**: API Level 36 (Android 15 / 16)
 - **Compile Android SDK**: API Level 36
+- **Firebase Project ID**: `yodhra` (Project Number: `884334760045`)
 
 ---
 
@@ -32,21 +33,21 @@ The official production release APK is signed with a dedicated RSA-2048 key usin
 
 | Package Type | File Name | Size | SHA-256 Checksum | Serving Endpoint |
 |---|---|---|---|---|
-| **Signed Production Release** | `YODHRA.apk` | 7.16 MB (7,512,524 bytes) | `7d59ead80f2a9bece0975085a931d05df69ffce0f8827d5b31ae982e4ca876ba` | `/downloads/YODHRA.apk` |
-| **Debug / Developer Build** | `YODHRA-debug.apk` | 8.80 MB (9,232,268 bytes) | `ef373c332634922ba20e21802a2d1589f0ef1c8ba1731748902cbb0ffdc2b262` | `/downloads/YODHRA-debug.apk` |
+| **Signed Production Release** | `YODHRA.apk` | 8.44 MB (8,854,253 bytes) | `bd6e8230e1850935124257709394e46c4a98c3ede59f726e4dde670878125cd6` | `/downloads/YODHRA.apk` |
+| **Debug / Developer Build** | `YODHRA-debug.apk` | 10.39 MB (10,898,484 bytes) | `1d9d3b1fcfa66979531962a907f121abc46996fa4745b2b5b77128c40146fb4b` | `/downloads/YODHRA-debug.apk` |
 
 ### Integrity Verification (Windows PowerShell)
 ```powershell
 Get-FileHash -Algorithm SHA256 backend/app/static/downloads/YODHRA.apk
 # Output must match:
-# 7D59EAD80F2A9BECE0975085A931D05DF69FFCE0F8827D5B31AE982E4CA876BA
+# BD6E8230E1850935124257709394E46C4A98C3EDE59F726E4DDE670878125CD6
 ```
 
 ### Integrity Verification (Linux / macOS)
 ```bash
 sha256sum backend/app/static/downloads/YODHRA.apk
 # Output:
-# 7d59ead80f2a9bece0975085a931d05df69ffce0f8827d5b31ae982e4ca876ba  YODHRA.apk
+# bd6e8230e1850935124257709394e46c4a98c3ede59f726e4dde670878125cd6  YODHRA.apk
 ```
 
 ---

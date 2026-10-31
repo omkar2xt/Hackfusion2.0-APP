@@ -1,4 +1,4 @@
-package in.edu.klsvdit.yodhra;
+package com.yodhra.app;
 
 import com.getcapacitor.BridgeActivity;
 
