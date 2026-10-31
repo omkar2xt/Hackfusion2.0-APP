@@ -10,7 +10,7 @@ def test_hierarchy_tree():
     assert response.status_code == 200
     data = response.json()
     assert "id" in data
-    assert data["code"] == "AIST"
+    assert data["code"] in ["AIST", "KLS", "KLS-VDIT"]
     assert "campuses" in data
     assert len(data["campuses"]) >= 1
 

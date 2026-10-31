@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.config import settings
-from app.database.session import init_db
+from app.database.session import init_db, close_db
 
 # Route imports
 from app.api.routes.health import router as health_router
@@ -29,13 +29,14 @@ import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Initialize database schema
-    print(f"[{settings.PROJECT_NAME}] Initializing database tables...")
-    init_db()
-    print(f"[{settings.PROJECT_NAME}] Database ready. Server running on port {settings.PORT}.")
+    # Startup: Run schema verification in a worker thread so port binding is instantaneous
+    print(f"[{settings.PROJECT_NAME}] Starting server on port {settings.PORT} (environment: {settings.ENVIRONMENT})...")
+    import asyncio
+    asyncio.create_task(asyncio.to_thread(init_db))
     yield
     # Shutdown
     print(f"[{settings.PROJECT_NAME}] Shutting down...")
+    close_db()
 
 
 app = FastAPI(

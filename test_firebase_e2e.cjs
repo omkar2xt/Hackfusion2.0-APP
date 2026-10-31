@@ -260,3 +260,4 @@ async function runTests() {
 }
 
 runTests();
+
