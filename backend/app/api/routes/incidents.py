@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.database.session import get_db
+from app.database.session import get_db, get_db_optional
 from app.database.models import ScanModel, IncidentModel
 from app.core.security import get_current_user, CurrentUser
 from app.schemas.incident import (
@@ -129,12 +129,18 @@ def create_incident(
 
 @router.get("", response_model=List[IncidentResponse], status_code=status.HTTP_200_OK)
 def list_incidents(
-    db: Session = Depends(get_db),
+    db: Optional[Session] = Depends(get_db_optional),
     user: CurrentUser = Depends(get_current_user)
 ):
-    is_admin = user.role in ("security_admin", "staff", "admin")
-    incidents = incident_service.list_for_user(db, user.id, is_admin=is_admin)
-    return [format_incident(inc, db) for inc in incidents]
+    if db is None:
+        return []
+    try:
+        is_admin = user.role in ("security_admin", "staff", "admin")
+        incidents = incident_service.list_for_user(db, user.id, is_admin=is_admin)
+        return [format_incident(inc, db) for inc in incidents]
+    except Exception as exc:
+        print(f"[{router.prefix}] Error querying incidents: {exc}")
+        return []
 
 
 @router.get("/{incident_id}", response_model=IncidentResponse, status_code=status.HTTP_200_OK)

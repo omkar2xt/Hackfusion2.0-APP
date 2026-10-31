@@ -45,11 +45,29 @@ export default function DashboardPage() {
       setApiError(null);
     } catch (err: any) {
       console.warn('Backend dashboard stats not reachable:', err);
-      setApiError(
-        err.message ||
-          'Cannot connect to backend server. Ensure the FastAPI service is running on port 8000.'
-      );
-      setStats(null);
+      const isDbInit = err.message && err.message.toLowerCase().includes('database');
+      const isTimeout = err.statusCode === 408 || (err.message && err.message.toLowerCase().includes('timed out'));
+
+      if (isDbInit) {
+        setApiError(
+          'Backend is connected. Database is currently connecting or initializing. Showing offline security telemetry.'
+        );
+        setStats({
+          total_scans: 0,
+          suspicious_results: 0,
+          reported_incidents: 0,
+          recent_scans: [],
+          recent_incidents: [],
+        });
+      } else if (isTimeout) {
+        setApiError(
+          'Backend service is waking up from standby (Render cold-start). Please wait a moment and tap Retry.'
+        );
+      } else {
+        setApiError(
+          err.message || 'Cannot reach backend server. Please verify your network or Render service status.'
+        );
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -142,7 +160,13 @@ export default function DashboardPage() {
           <div className="p-4 rounded-2xl bg-[#C58A35]/10 border border-[#C58A35]/30 text-[#C58A35] text-xs flex items-start gap-3">
             <AlertTriangle size={20} className="text-[#C58A35] flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold text-[#202A35]">Backend Server Disconnected</p>
+              <p className="font-semibold text-[#202A35]">
+                {apiError.toLowerCase().includes('cold-start') || apiError.toLowerCase().includes('waking up')
+                  ? 'Backend Server Warming Up'
+                  : apiError.toLowerCase().includes('database')
+                  ? 'Database Connecting'
+                  : 'Backend Service Notice'}
+              </p>
               <p className="mt-0.5 text-[#64748B] leading-relaxed">
                 {apiError}
               </p>

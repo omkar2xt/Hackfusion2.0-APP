@@ -335,3 +335,19 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def get_db_optional() -> Generator[Optional[Session], None, None]:
+    """
+    FastAPI dependency providing an optional transactional database session.
+    Yields None if the database is unconfigured or degraded, preventing full endpoint crashes.
+    """
+    if SessionLocal is None:
+        yield None
+        return
+
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
